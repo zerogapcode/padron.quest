@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/comun/base.css">
   <link rel="stylesheet" href="muro.css">
 </head>
 <body>
@@ -23,8 +24,12 @@
       <nav class="nav" id="nav" aria-label="Principal" hidden>
         <a href="/muro/" aria-current="page">Inicio</a>
         <a href="/arbol/">Árbol <span class="nav-badge" id="navProposals" hidden></span></a>
+        <a href="/mensajes/">Mensajes <span class="nav-badge" id="navMensajes" hidden></span></a>
+        <a href="/fotos/">Fotos</a>
+        <a href="/eventos/">Eventos</a>
       </nav>
       <div id="user" class="user" hidden>
+        <span id="campana"></span>
         <img id="user-photo" alt="" referrerpolicy="no-referrer">
         <span id="user-name"></span>
         <button id="btn-logout" class="ghost small" type="button">Salir</button>
@@ -80,6 +85,8 @@
         </svg>
       </section>
 
+      <p id="grupo-banner" class="card grupo-banner" hidden></p>
+
       <form id="composer" class="card composer" aria-label="Compartir con la familia">
         <div class="composer-row">
           <span class="avatar-ini" id="composer-avatar" aria-hidden="true"></span>
@@ -124,6 +131,11 @@
         <ol id="mi-rama" class="rama"></ol>
         <p id="mi-ficha-vacia" class="muted small" hidden>Todavía no estás vinculado a tu ficha del árbol. Pídeselo a un administrador.</p>
         <a class="enlace" href="/arbol/">Ver el árbol completo</a>
+      </section>
+
+      <section class="card" id="grupos" aria-labelledby="grupos-titulo">
+        <h2 id="grupos-titulo" class="titulo-tarjeta">Grupos por rama</h2>
+        <nav id="grupos-lista" class="grupos-lista" aria-label="Grupos por rama"></nav>
       </section>
 
       <section class="card" id="completar" aria-labelledby="completar-titulo">

@@ -2,44 +2,19 @@
 // La seguridad la imponen las reglas de Firestore/Storage: solo miembros invitados
 // leen y publican; cada quien solo marca su propio "me gusta"; solo los
 // administradores gestionan la lista de invitados.
-import { initializeApp } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js";
 import {
-  getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut,
-  connectAuthEmulator, signInWithCredential,
+  GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 import {
-  getFirestore, collection, collectionGroup, doc, getDoc, getDocs, setDoc, deleteDoc, addDoc, updateDoc,
+  collection, collectionGroup, doc, getDoc, getDocs, setDoc, deleteDoc, addDoc, updateDoc,
   query, where, orderBy, limit, onSnapshot, serverTimestamp, arrayUnion, arrayRemove, writeBatch,
-  connectFirestoreEmulator,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
 import {
-  getStorage, ref, uploadBytes, getDownloadURL, deleteObject, connectStorageEmulator,
+  ref, uploadBytes, getDownloadURL, deleteObject,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-storage.js";
+import { auth, db, storage, EMULADOR, avisar, montarCampana, montarContadorMensajes } from "/comun/base.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDkrGcwFUpxtImQdC0WWOgES5gfvGSjAsU",
-  authDomain: "padron-quest.firebaseapp.com",
-  projectId: "padron-quest",
-  storageBucket: "padron-quest.firebasestorage.app",
-  messagingSenderId: "570581063341",
-  appId: "1:570581063341:web:c595054a2ff6b043349824",
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
-
-// Pruebas locales con los emuladores de Firebase (?emulador=1 en localhost). Sin efecto en el sitio publicado.
-const EMULADOR = new URLSearchParams(location.search).has("emulador") && ["localhost", "127.0.0.1"].includes(location.hostname);
-if (EMULADOR) {
-  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-  connectFirestoreEmulator(db, "127.0.0.1", 8080);
-  connectStorageEmulator(storage, "127.0.0.1", 9199);
-  window.__entrarPrueba = (email, nombre) => signInWithCredential(auth, GoogleAuthProvider.credential(
-    JSON.stringify({ sub: email, email, email_verified: true, name: nombre || email })));
-  window.__db = { db, doc, updateDoc, arrayUnion, setDoc };
-}
+if (EMULADOR) window.__db = { db, doc, updateDoc, arrayUnion, setDoc, getDoc };
 
 const $ = (id) => document.getElementById(id);
 
@@ -56,6 +31,7 @@ const state = {
   comments: new Map(),
   members: [],
   profiles: new Map(),
+  branches: {},
   pendingProposals: 0,
   filter: "todo",
   openComments: new Set(),
@@ -65,6 +41,7 @@ const state = {
 const unsubs = [];
 const myEmail = () => (state.user?.email || "").toLowerCase();
 const safeUrl = (u) => (typeof u === "string" && (/^https:\/\//.test(u) || (EMULADOR && /^http:\/\/127\.0\.0\.1:/.test(u))) ? u : null);
+const GRUPO = new URLSearchParams(location.search).get("grupo") || null;
 
 // Construye elementos sin innerHTML (todo el texto de usuarios entra como texto).
 function h(tag, props = {}, ...children) {
@@ -221,16 +198,25 @@ async function enter(user) {
 
   $("nav").hidden = false;
   $("admin").hidden = !state.isAdmin;
+  unsubs.push(montarCampana($("campana")));
+  unsubs.push(montarContadorMensajes($("navMensajes")));
   $("composer-avatar").replaceChildren(avatar(user.displayName || email, user.photoURL, "avatar-ini"));
   show("view-wall");
 
   try {
     const cfg = await getDoc(doc(db, "config", "arbol"));
     state.rootId = cfg.exists() ? cfg.data().rootId || null : null;
+    state.branches = cfg.exists() ? cfg.data().branches || {} : {};
+    pintarGrupos();
   } catch { /* árbol aún sin cargar */ }
 
-  unsubs.push(onSnapshot(query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(60)), (snap) => {
-    state.posts = snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }));
+  const qPosts = GRUPO
+    ? query(collection(db, "posts"), where("group", "==", GRUPO), limit(150))
+    : query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(80));
+  unsubs.push(onSnapshot(qPosts, (snap) => {
+    state.posts = snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }))
+      .filter((p) => (GRUPO ? p.group === GRUPO : !p.group))
+      .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
     renderFeed();
     renderSaludo();
   }, (err) => { console.error(err); $("feed").textContent = "No se pudo cargar el muro (" + err.code + ")."; }));
@@ -402,7 +388,10 @@ function renderPost(p) {
     type: "button", class: "accion", "aria-pressed": String(meGusta),
     onclick: async (e) => {
       e.currentTarget.disabled = true;
-      try { await updateDoc(doc(db, "posts", p.id), { likedBy: meGusta ? arrayRemove(me.uid) : arrayUnion(me.uid) }); }
+      try {
+        await updateDoc(doc(db, "posts", p.id), { likedBy: meGusta ? arrayRemove(me.uid) : arrayUnion(me.uid) });
+        if (!meGusta) avisar(p.uid, { type: "me-gusta", text: `A ${(me.displayName || "un familiar").split(" ")[0]} le gustó tu publicación${p.text ? `: «${p.text.slice(0, 60)}»` : ""}.`, link: location.pathname + location.search });
+      }
       catch (err) { console.error(err); alert("No se pudo marcar: " + (err.code || err.message)); }
     },
   }, icon(ICON_CORAZON), h("span", { text: likedBy.length ? `Me gusta · ${likedBy.length}` : "Me gusta" }));
@@ -460,6 +449,9 @@ function renderPost(p) {
           });
           state.drafts.delete(p.id);
           ta.value = "";
+          const quien = (me.displayName || "Un familiar").split(" ")[0];
+          avisar(p.uid, { type: "comentario", text: `${quien} comentó tu publicación: «${texto.slice(0, 80)}»`, link: location.pathname + location.search });
+          new Set(comentarios.map((c) => c.uid)).forEach((uid) => { if (uid !== p.uid) avisar(uid, { type: "comentario", text: `${quien} también comentó: «${texto.slice(0, 80)}»`, link: location.pathname + location.search }); });
         } catch (err) {
           console.error(err);
           alert("No se pudo comentar: " + (err.code || err.message));
@@ -548,6 +540,7 @@ $("composer").addEventListener("submit", async (e) => {
       text,
       imageURL,
       imagePath,
+      ...(GRUPO ? { group: GRUPO } : {}),
       createdAt: serverTimestamp(),
     });
     $("post-text").value = "";
@@ -722,3 +715,25 @@ $("member-form").addEventListener("submit", async (e) => {
     alert("No se pudo invitar: " + (err.code || err.message));
   }
 });
+
+// ---------------------------------------------------------------------------
+// Grupos por rama
+// ---------------------------------------------------------------------------
+function pintarGrupos() {
+  const ramas = Object.values(state.branches).filter((b) => b.id !== "raiz").sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+  const lista = $("grupos-lista");
+  lista.replaceChildren(
+    h("a", { href: "/muro/", class: "grupo" + (GRUPO ? "" : " activo") }, h("span", { class: "punto-color", style: "background:#13293D" }), "Toda la familia Padrón"),
+    ...ramas.map((b) => h("a", { href: `/muro/?grupo=${encodeURIComponent(b.id)}`, class: "grupo" + (GRUPO === b.id ? " activo" : "") },
+      h("span", { class: "punto-color", style: `background:${/^#[0-9A-Fa-f]{6}$/.test(b.color) ? b.color : "#56636E"}` }), b.shortLabel)));
+  const banner = $("grupo-banner");
+  if (GRUPO) {
+    const b = state.branches[GRUPO];
+    banner.hidden = false;
+    banner.replaceChildren(
+      h("b", { text: `Grupo de la rama ${b ? b.shortLabel : ""}` }),
+      h("span", { text: b ? ` · ${b.description || b.label}. Lo que publiques aquí lo verá toda la familia, pero se guarda en este grupo.` : " · Este grupo ya no existe." }),
+      " ", h("a", { href: "/muro/", text: "Volver al muro de toda la familia" }));
+    document.title = `${b ? b.shortLabel : "Grupo"} · Familia Padrón`;
+  }
+}

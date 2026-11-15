@@ -1240,3 +1240,4 @@ dialog.modern-dialog::backdrop {
   .proposal-card { padding: 14px; }
   .diff-table th, .diff-table td { padding: 6px; }
 }
+.header-actions a.btn { text-decoration: none; }

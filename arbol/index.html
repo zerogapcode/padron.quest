@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/comun/base.css" />
   <link rel="stylesheet" href="arbol.css" />
 </head>
 <body>
@@ -68,7 +69,11 @@
       <div class="header-actions">
         <button type="button" class="btn btn-primary" id="btnAddPersonTop">+ Agregar familiar</button>
         <button type="button" class="btn" id="btnOpenAdmin" hidden>Herramientas</button>
-        <a class="btn" href="/muro/">Muro</a>
+        <a class="btn" href="/muro/">Inicio</a>
+        <a class="btn" href="/mensajes/">Mensajes <span class="count-badge" id="navMensajes" hidden>0</span></a>
+        <a class="btn" href="/fotos/">Fotos</a>
+        <a class="btn" href="/eventos/">Eventos</a>
+        <span id="campana"></span>
         <button type="button" class="btn btn-icon" id="btnThemeToggle" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema claro u oscuro">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         </button>

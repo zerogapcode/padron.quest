@@ -6,39 +6,16 @@
 //   - cualquier miembro crea `proposals`; solo administradores las deciden.
 // Ningún dato familiar vive en este archivo (el repo es público).
 // ============================================================================
-import { initializeApp } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js";
 import {
-  getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut,
-  connectAuthEmulator, signInWithCredential,
+  GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 import {
-  getFirestore, collection, doc, getDoc, getDocs, onSnapshot, query, where, limit, orderBy,
-  writeBatch, serverTimestamp, addDoc, deleteDoc, setDoc, connectFirestoreEmulator,
+  collection, doc, getDoc, getDocs, onSnapshot, query, where, limit, orderBy,
+  writeBatch, serverTimestamp, addDoc, deleteDoc, setDoc,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
+import { auth, db, EMULADOR, avisar, montarCampana, montarContadorMensajes } from "/comun/base.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDkrGcwFUpxtImQdC0WWOgES5gfvGSjAsU",
-  authDomain: "padron-quest.firebaseapp.com",
-  projectId: "padron-quest",
-  storageBucket: "padron-quest.firebasestorage.app",
-  messagingSenderId: "570581063341",
-  appId: "1:570581063341:web:c595054a2ff6b043349824",
-};
-
-const fbApp = initializeApp(firebaseConfig);
-const auth = getAuth(fbApp);
-const db = getFirestore(fbApp);
-
-// Pruebas locales: con ?emulador=1 en localhost se usan los emuladores de Firebase
-// (no afecta al sitio publicado: allí la condición nunca se cumple).
-if (new URLSearchParams(location.search).has("emulador") && ["localhost", "127.0.0.1"].includes(location.hostname)) {
-  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-  connectFirestoreEmulator(db, "127.0.0.1", 8080);
-  // El emulador de Auth acepta credenciales de Google sin firmar: así se prueba sin ventana emergente.
-  window.__entrarPrueba = (email, nombre) => signInWithCredential(auth, GoogleAuthProvider.credential(
-    JSON.stringify({ sub: email, email, email_verified: true, name: nombre || email })));
-  window.__db = { db, doc, setDoc, getDoc };
-}
+if (EMULADOR) window.__db = { db, doc, setDoc, getDoc };
 
 // ---------------------------------------------------------------------------
 // Estado
@@ -248,6 +225,8 @@ async function enter(user) {
   if (photo) $("userPhoto").src = photo;
   $("adminBadge").hidden = !state.isAdmin;
   $("btnOpenAdmin").hidden = !state.isAdmin;
+  unsubs.push(montarCampana($("campana")));
+  unsubs.push(montarContadorMensajes($("navMensajes")));
 
   try {
     const cfg = await getDoc(doc(db, "config", "arbol"));
@@ -1027,6 +1006,13 @@ async function decideProposal(pr, status, decisionNote, button) {
     });
     await batch.commit();
     showToast(status === "approved" ? `Aprobado: ${pr.personName}` : `Rechazado: ${pr.personName}`);
+    avisar(pr.uid, {
+      type: "propuesta",
+      text: status === "approved"
+        ? `Se aprobó tu propuesta sobre ${pr.personName}. ¡Gracias por completar el árbol!${decisionNote ? " Nota: " + decisionNote : ""}`
+        : `No se aprobó tu propuesta sobre ${pr.personName}.${decisionNote ? " Motivo: " + decisionNote : ""}`,
+      link: "/arbol/",
+    });
   } catch (err) {
     console.error(err);
     showToast("No se pudo guardar la decisión: " + (err.code || err.message));

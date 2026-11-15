@@ -185,3 +185,14 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 600; }
 }
 .member-list .fila span { min-width: 0; overflow-wrap: anywhere; }
 .member-list .fila button { flex: none; }
+
+/* Grupos por rama */
+.grupos-lista { display: flex; flex-direction: column; }
+.grupo { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 10px; border-radius: 12px; color: var(--tinta); font-weight: 600; text-decoration: none; }
+.grupo:hover { background: var(--arena-2); }
+.grupo.activo { background: var(--cielo-claro); color: var(--oceano); font-weight: 700; }
+.punto-color { width: 10px; height: 10px; flex: none; border-radius: 50%; }
+.grupo-banner { background: var(--cielo-claro); font-size: 16px; }
+.nav { overflow-x: auto; scrollbar-width: none; }
+.nav a { flex: none; }
+@media (max-width: 640px) { .nav a { flex: none; padding: 0 11px; } }
