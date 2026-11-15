@@ -3,132 +3,478 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>padron.quest</title>
-  <meta name="description" content="padron.quest — próximamente">
+  <title>Familia Padrón · padron.quest</title>
+  <meta name="description" content="La red privada de la familia Padrón: desde el Valle de La Orotava, 1869.">
+  <meta name="theme-color" content="#13293D">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='19' fill='%23D9A55B'/%3E%3Cpath d='M9 18c1-6 5.6-9 11-9s10 3 11 9c-3 .9-19 .9-22 0Z' fill='%2313293D'/%3E%3Cpath d='M18.4 31.5 18.9 22h2.2l.5 9.5Z' fill='%2313293D'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&display=swap" rel="stylesheet">
   <style>
-    :root { --bg:#0e0f13; --fg:#f2f2f2; --muted:#9a9fab; --accent:#e8b04b; }
-    * { box-sizing:border-box; margin:0; }
-    body { min-height:100vh; display:grid; place-items:center; background:var(--bg); color:var(--fg);
-           font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; padding:16px; }
-    main { display:flex; align-items:center; justify-content:center; gap:clamp(1.5rem,5vw,4rem);
-           width:100%; max-width:1100px; }
-    .text { flex:1 1 0; min-width:0; }
-    .hero { flex:0 0 auto; height:min(80vh,720px); width:auto; max-width:45vw;
-            object-fit:contain; filter:drop-shadow(0 20px 40px rgba(0,0,0,.45)); }
-    @media (max-width: 700px) {
-      main { flex-direction:column; text-align:center; }
-      .units { justify-content:center; }
-      .unit { min-width:0; flex:1 1 0; }
-      .hero { height:auto; width:min(70vw,320px); max-width:none; }
+    :root {
+      --oceano: #13293D; --oceano-2: #1B3650; --oceano-3: #2E4D69;
+      --atlantico: #1F5673; --arena: #F5F0E8; --linea: #E6DDCE;
+      --tinta: #1C2A36; --tinta-suave: #56636E;
+      --ocre: #D9A55B; --ocre-oscuro: #8A5A1E; --ocre-claro: #F6E8D2;
+      --drago: #4E7A62; --drago-claro: #E4EDE6; --cielo-claro: #E2EBF1;
+      --bruma: #C9D3DC; --bruma-2: #9FB0BE;
+      --serif: "Fraunces", Georgia, serif;
+      --sans: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
     }
-    h1 { font-size:clamp(2.2rem,8vw,4.5rem); letter-spacing:-.03em; min-height:1.2em; }
-    .accent { color:var(--accent); }
-    p { color:var(--muted); margin-top:.75rem; font-size:1.1rem; min-height:1.5em; }
-    .countdown { margin-top:2rem; opacity:0; transform:translateY(8px); transition:opacity .6s, transform .6s; }
-    .countdown.show { opacity:1; transform:none; }
-    .units { display:flex; gap:clamp(.5rem,2vw,1rem); }
-    .unit { background:#1a1c23; border:1px solid #2a2d37; border-radius:12px;
-            padding:.75rem .5rem; min-width:4.5rem; text-align:center; }
-    .num { display:block; font-size:clamp(1.6rem,5vw,2.4rem); font-weight:700;
-           font-variant-numeric:tabular-nums; color:var(--fg); }
-    .lbl { display:block; font-size:.75rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-top:.25rem; }
-    .when { margin-top:.9rem; font-size:.95rem; color:var(--muted); }
-    .when strong { color:var(--accent); font-weight:600; }
-    .cursor { display:inline-block; width:.08em; min-width:2px; height:1em; margin-left:.06em;
-              background:var(--accent); vertical-align:-.1em; animation:blink 1s steps(1) infinite; }
-    @keyframes blink { 50% { opacity:0; } }
-    @media (prefers-reduced-motion: reduce) { .cursor { animation:none; } }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html { scroll-behavior: smooth; }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    body { margin: 0; background: var(--arena); color: var(--tinta); font-family: var(--sans); font-size: 17px; line-height: 1.55; }
+    a { color: var(--atlantico); }
+    a:hover { color: var(--oceano); }
+    h1, h2, h3 { font-family: var(--serif); font-weight: 600; margin: 0; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
+    .serif-acento { font-style: italic; font-weight: 500; color: var(--ocre); }
+    .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 54px; padding: 0 28px; border-radius: 14px; font-size: 17px; font-weight: 700; text-decoration: none; }
+    .btn-ocre { background: var(--ocre); color: var(--oceano); }
+    .btn-ocre:hover { background: #E4B771; color: var(--oceano); }
+    .btn-borde { border: 1px solid rgba(245, 240, 232, .35); color: var(--arena); font-weight: 600; }
+    .btn-borde:hover { background: rgba(245, 240, 232, .08); color: var(--arena); }
+
+    /* ---------- Héroe ---------- */
+    .heroe { background: var(--oceano); color: var(--arena); overflow: hidden; }
+    .barra { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; padding-top: 20px; padding-bottom: 20px; }
+    .marca { display: flex; align-items: center; gap: 12px; min-height: 44px; color: var(--arena); text-decoration: none; }
+    .marca:hover { color: var(--arena); }
+    .marca-texto { display: flex; flex-direction: column; line-height: 1.05; }
+    .marca-texto b { font-family: var(--serif); font-size: 24px; font-weight: 600; letter-spacing: -.01em; }
+    .marca-texto small { font-size: 12px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; color: var(--bruma); }
+    .barra nav { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
+    .barra nav a { display: flex; align-items: center; min-height: 44px; padding: 0 14px; color: var(--bruma); font-size: 16px; font-weight: 500; text-decoration: none; }
+    .barra nav a:hover { color: var(--arena); }
+
+    .heroe-cuerpo { display: flex; flex-wrap: wrap; align-items: center; gap: 48px; padding-top: 48px; }
+    .heroe-texto { flex: 1 1 520px; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 24px; }
+    .etiqueta { padding: 7px 16px; border: 1px solid rgba(217, 165, 91, .5); border-radius: 999px; color: var(--ocre); font-size: 14px; font-weight: 600; letter-spacing: .04em; }
+    .heroe h1 { font-size: clamp(2.8rem, 8vw, 4.4rem); line-height: 1.02; letter-spacing: -.025em; }
+    .heroe-texto p { margin: 0; max-width: 540px; font-size: 1.2rem; line-height: 1.6; color: var(--bruma); }
+    .acciones { display: flex; flex-wrap: wrap; gap: 12px; }
+    .aviso { display: flex; align-items: center; gap: 10px; font-size: 15px !important; color: var(--bruma-2) !important; }
+
+    .raices { flex: 1 1 340px; min-width: 0; max-width: 460px; padding: 30px 30px 26px; border-radius: 26px; background: var(--oceano-2); }
+    .raices h2 { font-size: 24px; margin-bottom: 20px; }
+    .linea-tiempo { margin: 0; padding: 0; list-style: none; }
+    .linea-tiempo li { display: flex; gap: 16px; }
+    .linea-tiempo .eje { width: 14px; flex: none; display: flex; flex-direction: column; align-items: center; }
+    .linea-tiempo .punto { width: 12px; height: 12px; margin-top: 6px; border-radius: 999px; background: #5F7C96; flex: none; }
+    .linea-tiempo .punto.clave { width: 14px; height: 14px; margin-top: 5px; background: var(--ocre); box-shadow: 0 0 0 5px rgba(217, 165, 91, .18); }
+    .linea-tiempo .punto.hueco { background: none; border: 2px solid var(--ocre); }
+    .linea-tiempo .tramo { width: 2px; flex: 1; background: var(--oceano-3); }
+    .linea-tiempo .dato { padding-bottom: 18px; }
+    .linea-tiempo li:last-child .dato { padding-bottom: 0; }
+    .linea-tiempo b { display: block; font-size: 17px; font-weight: 600; }
+    .linea-tiempo b.clave { color: var(--ocre); font-weight: 700; }
+    .linea-tiempo span.sub { display: block; font-size: 14.5px; color: var(--bruma-2); }
+
+    .paisaje { display: block; width: 100%; height: auto; margin-top: 36px; }
+
+    /* ---------- Cifras ---------- */
+    .cifras { display: flex; flex-wrap: wrap; gap: 32px 24px; padding-top: 56px; padding-bottom: 56px; }
+    .cifra { flex: 1 1 220px; min-width: 0; }
+    .cifra b { display: block; font-family: var(--serif); font-size: 3.2rem; font-weight: 600; line-height: 1; color: var(--oceano); }
+    .cifra span { display: block; margin-top: 10px; font-size: 16px; color: var(--tinta-suave); }
+
+    /* ---------- Historia ---------- */
+    .historia { background: #fff; }
+    .historia .wrap { padding-top: 80px; padding-bottom: 80px; display: flex; flex-direction: column; gap: 44px; }
+    .sobretitulo { margin: 0 0 12px; font-size: 14px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ocre-oscuro); }
+    .titulo-seccion { font-size: clamp(2rem, 5vw, 2.7rem); line-height: 1.12; letter-spacing: -.015em; color: var(--oceano); }
+    .capitulos { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 36px 28px; }
+    .capitulos li { flex: 1 1 230px; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+    .capitulos .riel { display: flex; align-items: center; gap: 10px; }
+    .capitulos .riel i { width: 14px; height: 14px; flex: none; border-radius: 999px; }
+    .capitulos .riel hr { flex: 1; height: 2px; margin: 0; border: 0; background: var(--linea); }
+    .capitulos .lugar { font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+    .capitulos .anio { font-family: var(--serif); font-size: 2rem; font-weight: 600; line-height: 1; color: var(--oceano); }
+    .capitulos p { margin: 0; font-size: 16px; color: var(--tinta-suave); }
+
+    /* ---------- Qué hay dentro ---------- */
+    .dentro { display: flex; flex-wrap: wrap; gap: 48px; padding-top: 80px; padding-bottom: 80px; }
+    .dentro-intro { flex: 1 1 340px; min-width: 0; max-width: 420px; }
+    .dentro-intro p.lead { margin: 16px 0 0; font-size: 18px; color: var(--tinta-suave); }
+    .funciones { flex: 999 1 520px; min-width: 0; display: flex; flex-wrap: wrap; gap: 20px; }
+    .funcion { flex: 1 1 260px; min-width: 0; padding: 26px; border-radius: 22px; background: #fff; display: flex; flex-direction: column; gap: 12px; }
+    .funcion .icono { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border-radius: 16px; }
+    .funcion h3 { font-size: 21px; color: var(--oceano); }
+    .funcion p { margin: 0; font-size: 16px; color: var(--tinta-suave); }
+
+    /* ---------- Unirse ---------- */
+    .unirse { padding-bottom: 80px; }
+    .unirse-panel { padding: 52px 48px; border-radius: 32px; background: var(--oceano); color: var(--arena); display: flex; flex-wrap: wrap; gap: 40px 56px; }
+    .unirse-texto { flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 18px; }
+    .unirse-texto h2 { font-size: clamp(2rem, 5vw, 2.6rem); line-height: 1.1; letter-spacing: -.015em; }
+    .unirse-texto > p { margin: 0; max-width: 480px; font-size: 18px; color: var(--bruma); }
+    .pasos { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px; }
+    .pasos li { display: flex; align-items: center; gap: 14px; }
+    .pasos li span:first-child { width: 32px; height: 32px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--oceano-2); color: var(--ocre); font-weight: 700; }
+    .contacto { margin: 0; font-size: 15px; color: var(--bruma-2); }
+    .contacto a { color: var(--arena); font-weight: 700; }
+    .garantias { flex: 1 1 300px; min-width: 0; margin: 0; padding: 28px; border-radius: 22px; background: var(--oceano-2); list-style: none; display: flex; flex-direction: column; justify-content: center; gap: 22px; }
+    .garantias li { display: flex; gap: 14px; align-items: flex-start; }
+    .garantias svg { flex: none; margin-top: 2px; }
+    .garantias b { display: block; font-size: 17px; }
+    .garantias span { font-size: 15.5px; color: var(--bruma); }
+
+    footer { border-top: 1px solid var(--linea); }
+    footer .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding-top: 24px; padding-bottom: 24px; font-size: 15px; color: var(--tinta-suave); }
+    footer b { font-family: var(--serif); font-size: 18px; font-weight: 600; color: var(--oceano); }
+
+    @media (max-width: 640px) {
+      body { font-size: 16px; }
+      .barra nav { display: none; }
+      .heroe-cuerpo { padding-top: 24px; gap: 32px; }
+      .raices { padding: 24px; }
+      .unirse-panel { padding: 32px 22px; border-radius: 24px; }
+      .historia .wrap, .dentro { padding-top: 56px; padding-bottom: 56px; }
+    }
+
+    /* ---------- Pantalla de espera (hasta el lanzamiento) ---------- */
+    .espera { position: fixed; inset: 0; z-index: 10; overflow: auto; background: var(--oceano); color: var(--arena);
+              display: grid; place-items: center; padding: 16px; transition: opacity .9s ease, visibility .9s; }
+    .espera.oculta { opacity: 0; visibility: hidden; }
+    .espera-cuerpo { display: flex; align-items: center; justify-content: center; gap: clamp(1.5rem, 5vw, 4rem); width: 100%; max-width: 1100px; }
+    .espera-texto { flex: 1 1 0; min-width: 0; }
+    .espera h1 { font-size: clamp(2.4rem, 8vw, 4.5rem); letter-spacing: -.03em; min-height: 1.2em; }
+    .espera-texto > p { color: var(--bruma); margin: .75rem 0 0; font-size: 1.15rem; min-height: 1.5em; }
+    .espera .foto { flex: 0 0 auto; height: min(80vh, 720px); width: auto; max-width: 45vw; object-fit: contain; filter: drop-shadow(0 20px 40px rgba(0, 0, 0, .45)); }
+    .cuenta { margin-top: 2rem; opacity: 0; transform: translateY(8px); transition: opacity .6s, transform .6s; }
+    .cuenta.visible { opacity: 1; transform: none; }
+    .unidades { display: flex; gap: clamp(.5rem, 2vw, 1rem); }
+    .unidad { background: var(--oceano-2); border: 1px solid var(--oceano-3); border-radius: 14px; padding: .75rem .5rem; min-width: 4.5rem; text-align: center; }
+    .unidad b { display: block; font-family: var(--serif); font-size: clamp(1.6rem, 5vw, 2.4rem); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .unidad span { display: block; font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: var(--bruma-2); margin-top: .25rem; }
+    .cuando { margin-top: .9rem; font-size: .95rem; color: var(--bruma); }
+    .cuando strong { color: var(--ocre); font-weight: 600; }
+    .cursor { display: inline-block; width: .08em; min-width: 2px; height: 1em; margin-left: .06em; background: var(--ocre); vertical-align: -.1em; animation: parpadeo 1s steps(1) infinite; }
+    @keyframes parpadeo { 50% { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .cursor { animation: none; } .espera, .cuenta { transition: none; } }
+    @media (max-width: 700px) {
+      .espera-cuerpo { flex-direction: column; text-align: center; }
+      .unidades { justify-content: center; }
+      .unidad { min-width: 0; flex: 1 1 0; }
+      .espera .foto { height: auto; width: min(70vw, 320px); max-width: none; }
+    }
   </style>
 </head>
 <body>
-  <main>
-    <div class="text">
-      <h1 aria-label="padron.quest"><span class="typed" aria-hidden="true"></span></h1>
-      <p aria-label="Próximamente."><span class="typed" aria-hidden="true"></span></p>
-      <section class="countdown" aria-label="Cuenta regresiva">
-        <div class="units" role="timer" aria-live="off">
-          <div class="unit"><span class="num" id="d">0</span><span class="lbl">días</span></div>
-          <div class="unit"><span class="num" id="h">00</span><span class="lbl">horas</span></div>
-          <div class="unit"><span class="num" id="m">00</span><span class="lbl">min</span></div>
-          <div class="unit"><span class="num" id="s">00</span><span class="lbl">seg</span></div>
+
+  <!-- Pantalla de espera: visible solo hasta el lanzamiento -->
+  <section class="espera" id="espera" aria-label="Cuenta regresiva para el lanzamiento" hidden>
+    <div class="espera-cuerpo">
+      <div class="espera-texto">
+        <h1 aria-label="padron.quest"><span class="tecleo" aria-hidden="true"></span></h1>
+        <p aria-label="La red de la familia Padrón abre muy pronto."><span class="tecleo" aria-hidden="true"></span></p>
+        <div class="cuenta" id="cuenta">
+          <div class="unidades" role="timer" aria-live="off">
+            <div class="unidad"><b id="d">0</b><span>días</span></div>
+            <div class="unidad"><b id="h">00</b><span>horas</span></div>
+            <div class="unidad"><b id="m">00</b><span>min</span></div>
+            <div class="unidad"><b id="s">00</b><span>seg</span></div>
+          </div>
+          <p class="cuando" id="cuando"></p>
         </div>
-        <p class="when" id="when"></p>
-      </section>
+      </div>
+      <img class="foto" src="papa.png" width="1054" height="1492"
+           alt="Hombre mayor con casco amarillo, chaleco reflectante y un pico al hombro">
     </div>
-    <img class="hero" src="papa.png" width="1054" height="1492"
-         alt="Hombre mayor con casco amarillo, chaleco reflectante y un pico al hombro">
+  </section>
+
+  <main id="portada">
+    <section class="heroe">
+      <header class="wrap barra">
+        <a class="marca" href="#portada">
+          <svg width="42" height="42" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="19" fill="#D9A55B"/><path d="M9 18c1-6 5.6-9 11-9s10 3 11 9c-3 .9-19 .9-22 0Z" fill="#13293D"/><path d="M18.4 31.5 18.9 22h2.2l.5 9.5Z" fill="#13293D"/><path d="M20 23.5 14.5 18M20 23.5 25.5 18M20 23.5V17" stroke="#13293D" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>
+          <span class="marca-texto"><b>Padrón</b><small>Familia</small></span>
+        </a>
+        <nav aria-label="Secciones">
+          <a href="#historia">Nuestra historia</a>
+          <a href="#dentro">Qué hay dentro</a>
+          <a href="#unirse">Cómo unirse</a>
+          <a href="/muro/">Entrar</a>
+        </nav>
+      </header>
+
+      <div class="wrap heroe-cuerpo">
+        <div class="heroe-texto">
+          <span class="etiqueta">Desde el Valle de La Orotava · 1869</span>
+          <h1>La familia<br><span class="serif-acento">Padrón</span></h1>
+          <p>Ocho generaciones, de Tenerife a Caracas y de Caracas al mundo. Un lugar privado para reencontrarnos, completar nuestro árbol y no perdernos ningún cumpleaños.</p>
+          <div class="acciones">
+            <a class="btn btn-ocre" href="#unirse">Pedir mi invitación</a>
+            <a class="btn btn-borde" href="/muro/">Ya tengo invitación · Entrar</a>
+          </div>
+          <p class="aviso">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>
+            <span>Solo para familiares. Nada de lo que se comparte dentro es público.</span>
+          </p>
+        </div>
+
+        <aside class="raices" aria-labelledby="titulo-raices">
+          <h2 id="titulo-raices">Nuestras raíces</h2>
+          <ol class="linea-tiempo">
+            <li><span class="eje"><span class="punto"></span><span class="tramo"></span></span><span class="dato"><b>Francisco Padrón</b><span class="sub">Islas Canarias</span></span></li>
+            <li><span class="eje"><span class="punto"></span><span class="tramo"></span></span><span class="dato"><b>Basilio Padrón Luis</b><span class="sub">La Orotava, Tenerife</span></span></li>
+            <li><span class="eje"><span class="punto clave"></span><span class="tramo"></span></span><span class="dato"><b class="clave">Genaro Padrón Luis</b><span class="sub">La Orotava 1869 · Caracas 1936</span></span></li>
+            <li><span class="eje"><span class="punto"></span><span class="tramo"></span></span><span class="dato"><b>Ángel Ramón · Genaro · Matilde</b><span class="sub">Los Padrón Yumar, en Caracas</span></span></li>
+            <li><span class="eje"><span class="punto hueco"></span></span><span class="dato"><b>Más de cien familiares hoy</b><span class="sub">y el árbol sigue creciendo</span></span></li>
+          </ol>
+        </aside>
+      </div>
+
+      <svg class="paisaje" viewBox="0 0 1440 300" aria-hidden="true">
+        <circle cx="1110" cy="120" r="112" fill="#D9A55B" opacity=".1"/>
+        <circle cx="1110" cy="120" r="62" fill="#D9A55B" opacity=".88"/>
+        <path d="M968 66q6-6 12 0q6-6 12 0M1012 48q5-5 10 0q5-5 10 0" stroke="#9FB0BE" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+        <path d="M0 230 180 214l200-28 180-36 100-38 40-28 22-8 24 10 44 30 110 42 180 40 180 24 180 10v68H0Z" fill="#1F3B55"/>
+        <path d="m680 98 20-14 22-8 24 10 22 15-20-4-16 7-18-8-16 7Z" fill="#F5F0E8" opacity=".3"/>
+        <path d="M0 262c160-26 320-16 480-22s280 12 440 6 340-14 520 2v52H0Z" fill="#183249"/>
+        <path d="M226 250c1-12 2-20 5-28h6c3 8 4 16 5 28Z" fill="#0F2234"/>
+        <path d="M234 224c-6-10-14-16-24-20M234 224c6-10 14-16 24-20M234 224v-22" stroke="#0F2234" stroke-width="5" stroke-linecap="round" fill="none"/>
+        <path d="M196 206c2-16 18-26 38-26s36 10 38 26c-10 3-66 3-76 0Z" fill="#0F2234"/>
+        <path d="M1300 256c1-8 1.5-14 3.5-19h4c2 5 2.5 11 3.5 19Z" fill="#0F2234"/>
+        <path d="M1305.5 238c-4-7-9-11-16-13M1305.5 238c4-7 9-11 16-13" stroke="#0F2234" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+        <path d="M1280 226c1.5-11 12-18 25.5-18s24 7 25.5 18c-7 2-44 2-51 0Z" fill="#0F2234"/>
+        <path d="M0 276h1440v24H0Z" fill="#0F2234"/>
+        <path d="M1070 283h80M1086 290h48M1099 296h22" stroke="#D9A55B" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+        <path d="M120 286h80M420 292h50M760 284h80M1320 290h60" stroke="#3B5D78" stroke-width="2" stroke-linecap="round" opacity=".7"/>
+      </svg>
+    </section>
+
+    <section class="wrap cifras" aria-label="La familia en cifras">
+      <div class="cifra"><b>8</b><span>generaciones en el árbol</span></div>
+      <div class="cifra"><b>1869</b><span>el nacimiento más antiguo con fecha registrada</span></div>
+      <div class="cifra"><b>3</b><span>ramas Padrón Yumar: Ángel Ramón, Genaro y Matilde</span></div>
+      <div class="cifra"><b>5</b><span>países donde han nacido los Padrón</span></div>
+    </section>
+
+    <section class="historia" id="historia" aria-labelledby="titulo-historia">
+      <div class="wrap">
+        <div style="max-width:720px">
+          <p class="sobretitulo">Nuestra historia</p>
+          <h2 class="titulo-seccion" id="titulo-historia">De La Orotava a Caracas, y de Caracas al mundo</h2>
+        </div>
+        <ol class="capitulos">
+          <li>
+            <span class="riel"><i style="background:var(--drago)"></i><hr></span>
+            <span class="lugar" style="color:var(--drago)">Islas Canarias</span>
+            <span class="anio">Siglo XIX</span>
+            <p>Francisco Padrón y Josefa Luis Pacheco. Su hijo Basilio Padrón Luis nace en el Valle de La Orotava, en Tenerife.</p>
+          </li>
+          <li>
+            <span class="riel"><i style="background:var(--ocre)"></i><hr></span>
+            <span class="lugar" style="color:var(--ocre-oscuro)">La Orotava</span>
+            <span class="anio">1869</span>
+            <p>El 24 de octubre nace Genaro Padrón Luis, el bisabuelo de quien desciende toda esta familia.</p>
+          </li>
+          <li>
+            <span class="riel"><i style="background:var(--atlantico)"></i><hr></span>
+            <span class="lugar" style="color:var(--atlantico)">Caracas</span>
+            <span class="anio">1903</span>
+            <p>Genaro y Rosa Margarita Yumar, nacida en Baruta, crían en Caracas a Ángel Ramón, Genaro y Matilde: las tres ramas Padrón Yumar.</p>
+          </li>
+          <li>
+            <span class="riel"><i style="border:3px solid var(--oceano)"></i><hr></span>
+            <span class="lugar" style="color:var(--oceano)">Hoy</span>
+            <span class="anio">2023</span>
+            <p>Ya hemos nacido en Venezuela, España, Estados Unidos, Panamá y Cuba. La generación más joven llegó en 2023.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="wrap dentro" id="dentro" aria-labelledby="titulo-dentro">
+      <div class="dentro-intro">
+        <p class="sobretitulo">Qué hay dentro</p>
+        <h2 class="titulo-seccion" id="titulo-dentro">Para estar cerca, aunque estemos lejos</h2>
+        <p class="lead">Pensado para todas las edades: letra grande, pocos botones y todo en español.</p>
+      </div>
+      <div class="funciones">
+        <div class="funcion">
+          <span class="icono" style="background:var(--drago-claro);color:var(--drago)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="2.5"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/><path d="M12 7.5V12m0 0H5.5v4M12 12h6.5v4"/></svg></span>
+          <h3>Un árbol vivo</h3>
+          <p>Encuentra tu lugar entre los Padrón y ayuda a completar fechas, fotos e historias.</p>
+        </div>
+        <div class="funcion">
+          <span class="icono" style="background:var(--cielo-claro);color:var(--atlantico)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="3"/><circle cx="8.5" cy="10" r="1.6"/><path d="m4 17 5-4.5 3.5 3 3-2.5L20 17"/></svg></span>
+          <h3>Muro y álbumes</h3>
+          <p>Noticias, recuerdos y fotos de siempre, compartidos solo con la familia.</p>
+        </div>
+        <div class="funcion">
+          <span class="icono" style="background:var(--ocre-claro);color:var(--ocre-oscuro)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
+          <h3>Cumpleaños y reuniones</h3>
+          <p>El calendario sale del árbol: nadie se queda sin su felicitación.</p>
+        </div>
+        <div class="funcion">
+          <span class="icono" style="background:var(--cielo-claro);color:var(--atlantico)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 4v-4A2.5 2.5 0 0 1 4 13.5v-7Z"/></svg></span>
+          <h3>Mensajes y grupos</h3>
+          <p>Habla en privado con tus primos, o con toda tu rama.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap unirse" id="unirse" aria-labelledby="titulo-unirse">
+      <div class="unirse-panel">
+        <div class="unirse-texto">
+          <h2 id="titulo-unirse">¿Eres <span class="serif-acento">Padrón</span>?</h2>
+          <p>Cualquier descendiente de Genaro Padrón Luis, y su pareja, puede pedir su invitación. La red la administra la propia familia y abre por etapas.</p>
+          <ol class="pasos">
+            <li><span>1</span><span>Pide tu invitación y di qué correo de Google usas</span></li>
+            <li><span>2</span><span>Un administrador de la familia te agrega</span></li>
+            <li><span>3</span><span>Entra con tu cuenta de Google</span></li>
+          </ol>
+          <div class="acciones">
+            <a class="btn btn-ocre" id="pedir" href="#unirse">Pedir mi invitación</a>
+            <a class="btn btn-borde" href="/muro/">Ya tengo invitación · Entrar</a>
+          </div>
+          <p class="contacto" id="contacto"></p>
+        </div>
+        <ul class="garantias">
+          <li>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D9A55B" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>
+            <div><b>Solo la familia</b><span>Se entra únicamente con invitación.</span></div>
+          </li>
+          <li>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D9A55B" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16v10H4z"/><path d="M8 11h8M8 14h5"/></svg>
+            <div><b>Sin publicidad</b><span>Nadie vende ni mira nuestros datos.</span></div>
+          </li>
+          <li>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D9A55B" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.2 2.4 2.4 4.6-5"/></svg>
+            <div><b>Un árbol cuidado</b><span>Cada dato nuevo lo revisa una administradora de la familia.</span></div>
+          </li>
+        </ul>
+      </div>
+    </section>
   </main>
+
+  <footer>
+    <div class="wrap">
+      <b>padron.quest</b>
+      <span>Hecho en familia, para la familia Padrón.</span>
+    </div>
+  </footer>
+
   <script>
-    // Cada línea es una lista de [texto, clase CSS opcional]
-    const lines = [
-      [["padron", ""], [".quest", "accent"]],
-      [["Próximamente.", ""]]
-    ];
-    const targets = document.querySelectorAll(".typed");
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const cursor = document.createElement("span");
-    cursor.className = "cursor";
+    // ---- Contacto para pedir invitación ----
+    // Rellena UNO de los dos. WhatsApp: solo dígitos con código de país (ej. "584141234567").
+    const WHATSAPP = "";
+    const CORREO = "";
+    const MENSAJE = "Hola, soy de la familia Padrón y quiero mi invitación a padron.quest.\nMi nombre: \nMi correo de Google: ";
 
-    const wait = ms => new Promise(r => setTimeout(r, ms));
+    (function contacto() {
+      const boton = document.getElementById("pedir");
+      const nota = document.getElementById("contacto");
+      if (WHATSAPP) {
+        boton.href = "https://wa.me/" + WHATSAPP + "?text=" + encodeURIComponent(MENSAJE);
+        boton.target = "_blank"; boton.rel = "noopener";
+        nota.textContent = "Te abrirá WhatsApp con el mensaje listo.";
+      } else if (CORREO) {
+        boton.href = "mailto:" + CORREO + "?subject=" + encodeURIComponent("Invitación a padron.quest") + "&body=" + encodeURIComponent(MENSAJE);
+        nota.textContent = "O escribe a " + CORREO;
+      } else {
+        // Sin contacto configurado: no mostrar un botón que no lleva a ningún lado.
+        boton.hidden = true;
+        nota.textContent = "Pídele tu invitación a quien administra la red en tu familia, con el correo de Google que usas.";
+      }
+    })();
 
-    async function typeLine(el, parts) {
-      el.after(cursor);
-      for (const [text, cls] of parts) {
-        const span = document.createElement("span");
-        if (cls) span.className = cls;
-        el.appendChild(span);
-        for (const ch of text) {
-          span.textContent += ch;
-          if (!reduce) await wait(70 + Math.random() * 90);
+    // ---- Lanzamiento: domingo 15 de noviembre de 2026, 6:00 p. m. en Miami (EST, UTC-5) ----
+    // Es un instante absoluto: cada visitante ve el tiempo correcto en su zona horaria.
+    // Añade ?ahora=2026-11-15T17:59:50-05:00 a la URL para simular otra hora.
+    const LANZAMIENTO = new Date("2026-11-15T18:00:00-05:00");
+    const simulado = new URLSearchParams(location.search).get("ahora");
+    const desfase = simulado && !isNaN(Date.parse(simulado)) ? Date.parse(simulado) - Date.now() : 0;
+    const ahora = () => Date.now() + desfase;
+
+    const espera = document.getElementById("espera");
+    const portada = document.getElementById("portada");
+
+    if (ahora() < LANZAMIENTO) {
+      espera.hidden = false;
+      portada.setAttribute("aria-hidden", "true");
+      portada.inert = true;
+      document.documentElement.style.overflow = "hidden";
+      iniciarEspera();
+    }
+
+    function abrirPortada() {
+      espera.classList.add("oculta");
+      portada.removeAttribute("aria-hidden");
+      portada.inert = false;
+      document.documentElement.style.overflow = "";
+      setTimeout(() => { espera.hidden = true; }, 1000);
+    }
+
+    function iniciarEspera() {
+      const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const espere = ms => new Promise(r => setTimeout(r, ms));
+      const lineas = [
+        [["padron", ""], [".quest", "serif-acento"]],
+        [["La red de la familia Padrón abre muy pronto.", ""]]
+      ];
+      const destinos = espera.querySelectorAll(".tecleo");
+      const cursor = document.createElement("span");
+      cursor.className = "cursor";
+
+      async function teclear(el, partes) {
+        el.after(cursor);
+        for (const [texto, clase] of partes) {
+          const span = document.createElement("span");
+          if (clase) span.className = clase;
+          el.appendChild(span);
+          for (const ch of texto) {
+            span.textContent += ch;
+            if (!reduce) await espere(55 + Math.random() * 80);
+          }
         }
       }
-    }
 
-    // ---- Cuenta regresiva ----
-    // Domingo 15 de noviembre de 2026, 6:00 p. m. en Miami (EST, UTC-5).
-    // Es un instante absoluto: cada visitante ve el tiempo correcto en su zona horaria.
-    const TARGET = new Date("2026-11-15T18:00:00-05:00");
-    const cd = document.querySelector(".countdown");
-    const el = id => document.getElementById(id);
-    const pad = n => String(n).padStart(2, "0");
+      const $ = id => document.getElementById(id);
+      const dos = n => String(n).padStart(2, "0");
+      const formato = tz => new Intl.DateTimeFormat("es", {
+        weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit", hour12: true,
+        ...(tz ? { timeZone: tz } : {})
+      }).format(LANZAMIENTO);
+      const zona = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const miami = formato("America/New_York");
+      const local = formato();
+      $("cuando").innerHTML = (zona === "America/New_York" || miami === local)
+        ? `<strong>${miami}</strong> (hora de Miami)`
+        : `<strong>${local}</strong> en tu hora local · ${miami} en Miami`;
 
-    const fmt = (tz) => new Intl.DateTimeFormat("es", {
-      weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit", hour12: true,
-      ...(tz ? { timeZone: tz } : {})
-    }).format(TARGET);
-    const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const miami = fmt("America/New_York");
-    const local = fmt();
-    el("when").innerHTML = (userTz === "America/New_York" || miami === local)
-      ? `<strong>${miami}</strong> (hora de Miami)`
-      : `<strong>${local}</strong> en tu hora local · ${miami} en Miami`;
-
-    function tick() {
-      const diff = TARGET - Date.now();
-      if (diff <= 0) {
-        cd.querySelector(".units").hidden = true;
-        el("when").innerHTML = "<strong>¡Ya es la hora!</strong>";
-        clearInterval(timer);
-        return;
+      function tic() {
+        const resta = LANZAMIENTO - ahora();
+        if (resta <= 0) {
+          clearInterval(reloj);
+          abrirPortada();
+          return;
+        }
+        const s = Math.floor(resta / 1000);
+        $("d").textContent = Math.floor(s / 86400);
+        $("h").textContent = dos(Math.floor(s / 3600) % 24);
+        $("m").textContent = dos(Math.floor(s / 60) % 60);
+        $("s").textContent = dos(s % 60);
       }
-      const s = Math.floor(diff / 1000);
-      el("d").textContent = Math.floor(s / 86400);
-      el("h").textContent = pad(Math.floor(s / 3600) % 24);
-      el("m").textContent = pad(Math.floor(s / 60) % 60);
-      el("s").textContent = pad(s % 60);
-    }
-    const timer = setInterval(tick, 1000);
-    tick();
+      const reloj = setInterval(tic, 1000);
+      tic();
 
-    (async () => {
-      await wait(reduce ? 0 : 600);
-      for (let i = 0; i < lines.length; i++) {
-        await typeLine(targets[i], lines[i]);
-        if (i < lines.length - 1) await wait(reduce ? 0 : 500);
-      }
-      await wait(reduce ? 0 : 300);
-      cd.classList.add("show");
-    })();
+      (async () => {
+        await espere(reduce ? 0 : 500);
+        for (let i = 0; i < lineas.length; i++) {
+          await teclear(destinos[i], lineas[i]);
+          if (i < lineas.length - 1) await espere(reduce ? 0 : 400);
+        }
+        await espere(reduce ? 0 : 300);
+        $("cuenta").classList.add("visible");
+      })();
+    }
   </script>
 </body>
 </html>
