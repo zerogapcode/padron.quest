@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>El árbol de los Padrón · padron.quest</title>
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#13293D" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='19' fill='%23D9A55B'/%3E%3Cpath d='M9 18c1-6 5.6-9 11-9s10 3 11 9c-3 .9-19 .9-22 0Z' fill='%2313293D'/%3E%3Cpath d='M18.4 31.5 18.9 22h2.2l.5 9.5Z' fill='%2313293D'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="arbol.css" />
+</head>
+<body>
+  <!-- ====== Acceso ====== -->
+  <section class="gate" id="gate">
+    <div class="gate-card" id="gate-loading">
+      <p>Cargando…</p>
+    </div>
+    <div class="gate-card" id="gate-login" hidden>
+      <h1>El árbol de los <em>Padrón</em></h1>
+      <p>Solo para familiares invitados. Entra con tu cuenta de Google.</p>
+      <button type="button" class="btn-gate" id="btnLogin">Entrar con Google</button>
+      <p class="error" id="loginError" hidden></p>
+      <a class="btn-gate ghost" href="/">Volver a la portada</a>
+    </div>
+    <div class="gate-card" id="gate-denied" hidden>
+      <h1>Aún no estás invitado</h1>
+      <p>La cuenta <code id="deniedEmail"></code> no está en la lista de familiares. Pídele a un administrador que te agregue y vuelve a intentarlo.</p>
+      <button type="button" class="btn-gate" id="btnRetry">Volver a intentar</button>
+      <button type="button" class="btn-gate ghost" id="btnLogoutDenied">Usar otra cuenta</button>
+    </div>
+    <div class="gate-card" id="gate-empty" hidden>
+      <h1>El árbol está vacío</h1>
+      <p id="emptyText">Todavía no se ha cargado el árbol. Un administrador debe importarlo.</p>
+      <button type="button" class="btn-gate" id="btnImportFromGate" hidden>Importar el árbol</button>
+    </div>
+  </section>
+
+  <div class="app-shell" id="app" hidden>
+    <!-- Top Header -->
+    <header class="top-header">
+      <div class="brand-block">
+        <a class="brand-crest" href="/" aria-label="Ir a la portada">
+          <svg width="42" height="42" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="19" fill="#D9A55B"/><path d="M9 18c1-6 5.6-9 11-9s10 3 11 9c-3 .9-19 .9-22 0Z" fill="#13293D"/><path d="M18.4 31.5 18.9 22h2.2l.5 9.5Z" fill="#13293D"/><path d="M20 23.5 14.5 18M20 23.5 25.5 18M20 23.5V17" stroke="#13293D" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>
+        </a>
+        <div class="brand-titles">
+          <h1>El árbol de los Padrón</h1>
+          <div class="brand-subtitle">
+            <span class="stat-pill" id="totalPeopleBadge">0 personas</span>
+            <span class="stat-pill" id="totalUnionsBadge">0 uniones</span>
+            <span class="stat-pill" id="totalGensBadge">0 generaciones</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- View Switcher -->
+      <nav class="view-tabs" aria-label="Vistas del árbol genealógico">
+        <button type="button" class="view-tab active" data-view="tree">Árbol</button>
+        <button type="button" class="view-tab" data-view="generations">Generaciones</button>
+        <button type="button" class="view-tab" data-view="nuclei">Familias</button>
+        <button type="button" class="view-tab" data-view="directory">Directorio</button>
+        <button type="button" class="view-tab" data-view="proposals">Propuestas <span class="count-badge" id="proposalsCount" hidden>0</span></button>
+      </nav>
+
+      <!-- Actions -->
+      <div class="header-actions">
+        <button type="button" class="btn btn-primary" id="btnAddPersonTop">+ Agregar familiar</button>
+        <button type="button" class="btn" id="btnOpenAdmin" hidden>Herramientas</button>
+        <a class="btn" href="/muro/">Muro</a>
+        <button type="button" class="btn btn-icon" id="btnThemeToggle" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema claro u oscuro">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <div class="user-chip">
+          <img id="userPhoto" alt="" referrerpolicy="no-referrer" hidden />
+          <span id="userName"></span>
+          <span class="badge-admin" id="adminBadge" hidden>Admin</span>
+          <button type="button" class="btn btn-sm" id="btnLogout">Salir</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Search & Lineage Filter Bar -->
+    <div class="filter-toolbar">
+      <div class="search-group">
+        <div class="search-input-wrap">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="search" id="globalSearchInput" class="search-input" placeholder="Buscar por nombre o lugar (ej. La Orotava, Caracas)…" aria-label="Buscar personas en el árbol" />
+          <button type="button" class="search-clear-btn" id="btnClearSearch" aria-label="Limpiar búsqueda">&times;</button>
+        </div>
+      </div>
+      <div class="branch-pills" id="branchPillsContainer" role="group" aria-label="Filtrar por rama"></div>
+    </div>
+
+    <!-- Main Workspace Body -->
+    <div class="workspace-body">
+      <!-- VIEW 1: TREE -->
+      <section class="view-container active" id="view-tree" aria-label="Lienzo del árbol genealógico">
+        <div class="tree-controls-bar">
+          <div class="focus-selector-group">
+            <label for="focusPersonSelect">Persona central:</label>
+            <select id="focusPersonSelect" class="select-control"></select>
+            <label for="treeLayoutModeSelect" style="margin-left:0.4rem;">Modo:</label>
+            <select id="treeLayoutModeSelect" class="select-control">
+              <option value="descendants">Descendencia</option>
+              <option value="hourglass">Completo (ancestros y descendientes)</option>
+              <option value="ancestors">Ancestros</option>
+            </select>
+          </div>
+          <div class="quick-focus-chips" id="quickFocusChips"></div>
+        </div>
+
+        <div class="tree-canvas-viewport" id="treeViewport">
+          <div class="tree-stage" id="treeStage">
+            <svg class="tree-svg-layer" id="treeSvg" width="5000" height="3500"></svg>
+            <div class="tree-nodes-layer" id="treeNodesLayer"></div>
+          </div>
+          <div class="canvas-hud">
+            <button type="button" class="btn btn-sm" id="btnZoomOut" title="Alejar" aria-label="Alejar">&minus;</button>
+            <span class="zoom-readout" id="zoomReadout">100%</span>
+            <button type="button" class="btn btn-sm" id="btnZoomIn" title="Acercar" aria-label="Acercar">&#43;</button>
+            <button type="button" class="btn btn-sm" id="btnCenterTree">Centrar</button>
+            <button type="button" class="btn btn-sm" id="btnFitTree">Ver todo</button>
+          </div>
+          <div class="canvas-legend">
+            <span class="legend-item"><span class="legend-line" style="background:#D9A55B;height:2.5px;"></span> Matrimonio / pareja</span>
+            <span class="legend-item"><span class="legend-line" style="border-top:2px dashed #CDBFA8;"></span> Ex-pareja</span>
+            <span class="legend-item"><span class="legend-line" style="background:#CDBFA8;"></span> Padres → hijos</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 2: GENERATIONS -->
+      <section class="view-container" id="view-generations" aria-label="Por generaciones">
+        <div class="tree-controls-bar">
+          <div class="focus-selector-group">
+            <span style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);">La familia Padrón, generación por generación</span>
+          </div>
+          <div style="display:flex;gap:0.4rem;">
+            <button type="button" class="btn btn-sm" id="btnExpandAllGens">Expandir todas</button>
+            <button type="button" class="btn btn-sm" id="btnCollapseAllGens">Colapsar todas</button>
+          </div>
+        </div>
+        <div class="scroll-view-body" id="generationsContainer"></div>
+      </section>
+
+      <!-- VIEW 3: FAMILY NUCLEI -->
+      <section class="view-container" id="view-nuclei" aria-label="Familias">
+        <div class="tree-controls-bar">
+          <div class="focus-selector-group">
+            <span style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);">Parejas y sus hijos. Usa «+ Agregar hijo/a» para proponer a alguien que falta.</span>
+          </div>
+        </div>
+        <div class="scroll-view-body"><div class="nuclei-grid" id="nucleiContainer"></div></div>
+      </section>
+
+      <!-- VIEW 4: DIRECTORY -->
+      <section class="view-container" id="view-directory" aria-label="Directorio completo">
+        <div class="tree-controls-bar">
+          <div class="focus-selector-group">
+            <label for="dirSortSelect">Ordenar por:</label>
+            <select id="dirSortSelect" class="select-control">
+              <option value="generation">Generación (antiguos → recientes)</option>
+              <option value="generation_desc">Generación (recientes → antiguos)</option>
+              <option value="name">Nombre (A → Z)</option>
+              <option value="branch">Rama</option>
+            </select>
+            <label for="dirStatusSelect" style="margin-left:0.5rem;">Estado:</label>
+            <select id="dirStatusSelect" class="select-control">
+              <option value="all">Todos</option>
+              <option value="living">Con vida</option>
+              <option value="deceased">Fallecidos</option>
+            </select>
+          </div>
+          <span id="directoryCountLabel" style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);"></span>
+        </div>
+        <div class="scroll-view-body">
+          <div class="directory-table-wrap">
+            <table class="directory-table">
+              <thead>
+                <tr><th>Nombre</th><th>Rama</th><th>Generación</th><th>Nacimiento</th><th>Defunción</th><th>Acciones</th></tr>
+              </thead>
+              <tbody id="directoryTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 5: PROPOSALS -->
+      <section class="view-container" id="view-proposals" aria-label="Propuestas de cambio">
+        <div class="tree-controls-bar">
+          <div class="focus-selector-group">
+            <span style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);" id="proposalsIntro"></span>
+          </div>
+          <div class="focus-selector-group">
+            <label for="proposalFilter">Mostrar:</label>
+            <select id="proposalFilter" class="select-control">
+              <option value="pending">Pendientes</option>
+              <option value="approved">Aprobadas</option>
+              <option value="rejected">Rechazadas</option>
+              <option value="all">Todas</option>
+            </select>
+          </div>
+        </div>
+        <div class="scroll-view-body"><div class="proposals-wrap" id="proposalsContainer"></div></div>
+      </section>
+
+      <!-- INSPECTOR -->
+      <aside class="inspector-drawer" id="inspectorDrawer" aria-label="Ficha de la persona">
+        <div class="inspector-header" id="inspectorHeader"></div>
+        <div class="inspector-body" id="inspectorBody"></div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD / EDIT PERSON -->
+  <dialog id="personDialog" class="modern-dialog" closedby="any" aria-labelledby="personDialogTitle">
+    <form id="personForm" method="dialog" novalidate>
+      <div class="dialog-header">
+        <h2 id="personDialogTitle">Agregar familiar</h2>
+        <button type="button" class="btn btn-icon btn-sm" id="btnClosePersonDialog" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="dialog-body">
+        <div id="approvalBanner" class="context-link-banner" hidden>Tu cambio no se publica al instante: lo revisa un administrador de la familia y, al aprobarlo, lo verá todo el mundo.</div>
+        <div id="relationContextBanner" class="context-link-banner" style="display:none;"></div>
+
+        <input type="hidden" id="formPersonId" />
+        <input type="hidden" id="formLinkMode" />
+        <input type="hidden" id="formTargetPersonId" />
+
+        <div class="form-grid">
+          <div class="form-field full-width">
+            <label for="formName">Nombre completo (nombres y apellidos) *</label>
+            <input type="text" id="formName" required minlength="2" maxlength="200" placeholder="Ej. Genaro Padrón Luis" />
+          </div>
+          <div class="form-field">
+            <label for="formGender">Sexo</label>
+            <select id="formGender">
+              <option value="Female">Femenino</option>
+              <option value="Male">Masculino</option>
+              <option value="Unknown">No especificado</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="formBranch">Rama</label>
+            <select id="formBranch"></select>
+          </div>
+          <div class="form-field">
+            <label for="formGeneration">Generación</label>
+            <select id="formGeneration"></select>
+          </div>
+          <div class="form-field">
+            <label for="formIsDeceased">Estado</label>
+            <select id="formIsDeceased">
+              <option value="false">Con vida</option>
+              <option value="true">Fallecido/a</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="formBirthDate">Fecha de nacimiento</label>
+            <input type="text" id="formBirthDate" maxlength="40" placeholder="Ej. 24 Oct 1869 o 1898" />
+          </div>
+          <div class="form-field">
+            <label for="formBirthPlace">Lugar de nacimiento</label>
+            <input type="text" id="formBirthPlace" maxlength="200" placeholder="Ej. La Orotava, Tenerife" />
+          </div>
+          <div class="form-field">
+            <label for="formDeathDate">Fecha de defunción</label>
+            <input type="text" id="formDeathDate" maxlength="40" placeholder="Ej. 9 Jul 1936" />
+          </div>
+          <div class="form-field">
+            <label for="formDeathPlace">Lugar de defunción</label>
+            <input type="text" id="formDeathPlace" maxlength="200" placeholder="Ej. Caracas, Venezuela" />
+          </div>
+          <div class="form-field">
+            <label for="formFatherId">Padre</label>
+            <select id="formFatherId"></select>
+          </div>
+          <div class="form-field">
+            <label for="formMotherId">Madre</label>
+            <select id="formMotherId"></select>
+          </div>
+          <div class="form-field">
+            <label for="formSpouseId">Pareja</label>
+            <select id="formSpouseId"></select>
+          </div>
+          <div class="form-field">
+            <label for="formSpouseStatus">Tipo de unión</label>
+            <select id="formSpouseStatus">
+              <option value="married">Matrimonio</option>
+              <option value="partner">Pareja</option>
+              <option value="divorced">Ex-pareja / divorcio</option>
+            </select>
+          </div>
+          <div class="form-field full-width">
+            <label for="formNotes">Notas e historia familiar</label>
+            <textarea id="formNotes" rows="2" maxlength="4000" placeholder="Profesión, anécdotas, dónde vivió…"></textarea>
+          </div>
+          <div class="form-field full-width" id="sourceField">
+            <label for="formSource">¿De dónde sale este dato? (para quien lo revise)</label>
+            <textarea id="formSource" rows="2" maxlength="2000" placeholder="Ej. Partida de nacimiento, me lo contó mi abuela, foto del documento…"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button type="button" class="btn" id="btnCancelPersonDialog">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btnSavePerson">Enviar propuesta</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL: ADMIN TOOLS -->
+  <dialog id="adminDialog" class="modern-dialog" closedby="any" aria-labelledby="adminDialogTitle">
+    <div class="dialog-header">
+      <h2 id="adminDialogTitle">Herramientas de administración</h2>
+      <button type="button" class="btn btn-icon btn-sm" id="btnCloseAdminDialog" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="dialog-body admin-tools">
+      <div class="context-link-banner" style="margin-bottom:0;">Solo los administradores ven esta ventana. Los datos del árbol viven en Firebase y nunca en el código público del sitio.</div>
+      <div style="border:1px solid var(--border-subtle);border-radius:12px;padding:1rem;">
+        <h3 style="margin:0 0 .35rem;font-size:.95rem;">Importar el árbol desde un archivo</h3>
+        <p style="margin:0 0 .75rem;font-size:.85rem;color:var(--text-secondary);">Elige el <code>data.js</code> (o un <code>.json</code> exportado) del árbol original. Solo se cargan los descendientes del primer Padrón y sus parejas. <strong>Reemplaza el árbol actual.</strong></p>
+        <input type="file" id="importFile" accept=".js,.json" />
+        <p id="importStatus" style="margin:.5rem 0 0;font-size:.85rem;"></p>
+      </div>
+      <div style="border:1px solid var(--border-subtle);border-radius:12px;padding:1rem;">
+        <h3 style="margin:0 0 .35rem;font-size:.95rem;">Descargar respaldo</h3>
+        <p style="margin:0 0 .75rem;font-size:.85rem;color:var(--text-secondary);">Un archivo <code>.json</code> con todas las personas tal como están hoy.</p>
+        <button type="button" class="btn btn-primary" id="btnDownloadJson">Descargar respaldo</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+  <script type="module" src="arbol.js"></script>
+</body>
+</html>
