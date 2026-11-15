@@ -9,6 +9,9 @@ import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc, deleteDoc, addDoc, query, orderBy, limit,
   onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
+import {
+  getStorage, ref, uploadBytes, getDownloadURL, deleteObject,
+} from "https://www.gstatic.com/firebasejs/13.3.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDkrGcwFUpxtImQdC0WWOgES5gfvGSjAsU",
@@ -22,6 +25,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 const $ = (id) => document.getElementById(id);
 const views = ["view-loading", "view-login", "view-denied", "view-wall"];
@@ -127,16 +131,18 @@ function renderFeed(snap) {
       t.title = date.toLocaleString("es");
     }
     el.querySelector(".post-text").textContent = p.text || "";
-    if (p.image) {
+    if (p.imageURL) {
       const img = el.querySelector(".post-img");
-      img.src = p.image;
+      img.src = p.imageURL;
       img.hidden = false;
     }
     if (me && (p.uid === me.uid || isAdmin)) {
       const del = el.querySelector(".post-delete");
       del.hidden = false;
       del.addEventListener("click", async () => {
-        if (confirm("¿Borrar esta publicación?")) await deleteDoc(doc(db, "posts", d.id));
+        if (!confirm("¿Borrar esta publicación?")) return;
+        await deleteDoc(doc(db, "posts", d.id));
+        if (p.imagePath) deleteObject(ref(storage, p.imagePath)).catch((e) => console.warn("foto no borrada", e));
       });
     }
     feed.appendChild(el);
@@ -144,7 +150,8 @@ function renderFeed(snap) {
 }
 
 // ---------- Publicar ----------
-let pendingImage = null;
+let pendingImage = null; // Blob JPEG listo para subir
+let previewURL = null;
 
 $("post-photo").addEventListener("change", async (e) => {
   const file = e.target.files[0];
@@ -153,7 +160,9 @@ $("post-photo").addEventListener("change", async (e) => {
   setStatus("Preparando foto…");
   try {
     pendingImage = await compressImage(file);
-    $("preview-img").src = pendingImage;
+    if (previewURL) URL.revokeObjectURL(previewURL);
+    previewURL = URL.createObjectURL(pendingImage);
+    $("preview-img").src = previewURL;
     $("preview").hidden = false;
     setStatus("");
   } catch (err) {
@@ -173,15 +182,25 @@ $("composer").addEventListener("submit", async (e) => {
   if (!text && !pendingImage) return;
   const user = auth.currentUser;
   $("btn-post").disabled = true;
-  setStatus("Publicando…");
   try {
+    let imageURL = null, imagePath = null;
+    if (pendingImage) {
+      setStatus("Subiendo foto…");
+      const rand = Math.random().toString(36).slice(2, 10);
+      imagePath = `posts/${user.uid}/${Date.now()}-${rand}.jpg`;
+      const objRef = ref(storage, imagePath);
+      await uploadBytes(objRef, pendingImage, { contentType: "image/jpeg", cacheControl: "public, max-age=31536000" });
+      imageURL = await getDownloadURL(objRef);
+    }
+    setStatus("Publicando…");
     await addDoc(collection(db, "posts"), {
       uid: user.uid,
       email: (user.email || "").toLowerCase(),
       name: user.displayName || user.email,
       photoURL: user.photoURL || null,
       text,
-      image: pendingImage,
+      imageURL,
+      imagePath,
       createdAt: serverTimestamp(),
     });
     $("post-text").value = "";
@@ -198,10 +217,11 @@ $("composer").addEventListener("submit", async (e) => {
 
 function setStatus(msg) { $("composer-status").textContent = msg; }
 
-// Reduce la foto en el navegador para que quepa en un documento de Firestore
-// (límite 1 MiB): máximo 1280 px y JPEG con calidad decreciente hasta < 700 KB.
-const MAX_SIDE = 1280;
-const MAX_CHARS = 700_000;
+// Reduce la foto en el navegador antes de subirla a Storage: máximo 2048 px
+// y JPEG con calidad decreciente hasta < 4 MB (las reglas aceptan hasta 5 MB).
+const MAX_SIDE = 2048;
+const MAX_BYTES = 4 * 1024 * 1024;
+const toBlob = (canvas, q) => new Promise((res) => canvas.toBlob(res, "image/jpeg", q));
 async function compressImage(file) {
   const url = URL.createObjectURL(file);
   try {
@@ -209,16 +229,16 @@ async function compressImage(file) {
     img.src = url;
     await img.decode();
     let side = MAX_SIDE;
-    for (let attempt = 0; attempt < 6; attempt++) {
+    for (let attempt = 0; attempt < 5; attempt++) {
       const scale = Math.min(1, side / Math.max(img.naturalWidth, img.naturalHeight));
       const w = Math.round(img.naturalWidth * scale);
       const h = Math.round(img.naturalHeight * scale);
       const canvas = document.createElement("canvas");
       canvas.width = w; canvas.height = h;
       canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-      for (const quality of [0.82, 0.7, 0.58]) {
-        const data = canvas.toDataURL("image/jpeg", quality);
-        if (data.length < MAX_CHARS) return data;
+      for (const quality of [0.85, 0.72]) {
+        const blob = await toBlob(canvas, quality);
+        if (blob && blob.size < MAX_BYTES) return blob;
       }
       side = Math.round(side * 0.75);
     }
