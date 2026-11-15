@@ -10,15 +10,53 @@
     * { box-sizing:border-box; margin:0; }
     body { min-height:100vh; display:grid; place-items:center; background:var(--bg); color:var(--fg);
            font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; padding:16px; text-align:center; }
-    h1 { font-size:clamp(2.2rem,8vw,4.5rem); letter-spacing:-.03em; }
-    h1 span { color:var(--accent); }
-    p { color:var(--muted); margin-top:.75rem; font-size:1.1rem; }
+    h1 { font-size:clamp(2.2rem,8vw,4.5rem); letter-spacing:-.03em; min-height:1.2em; }
+    .accent { color:var(--accent); }
+    p { color:var(--muted); margin-top:.75rem; font-size:1.1rem; min-height:1.5em; }
+    .cursor { display:inline-block; width:.08em; min-width:2px; height:1em; margin-left:.06em;
+              background:var(--accent); vertical-align:-.1em; animation:blink 1s steps(1) infinite; }
+    @keyframes blink { 50% { opacity:0; } }
+    @media (prefers-reduced-motion: reduce) { .cursor { animation:none; } }
   </style>
 </head>
 <body>
   <main>
-    <h1>padron<span>.quest</span></h1>
-    <p>Próximamente.</p>
+    <h1 aria-label="padron.quest"><span class="typed" aria-hidden="true"></span></h1>
+    <p aria-label="Próximamente."><span class="typed" aria-hidden="true"></span></p>
   </main>
+  <script>
+    // Cada línea es una lista de [texto, clase CSS opcional]
+    const lines = [
+      [["padron", ""], [".quest", "accent"]],
+      [["Próximamente.", ""]]
+    ];
+    const targets = document.querySelectorAll(".typed");
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const cursor = document.createElement("span");
+    cursor.className = "cursor";
+
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+
+    async function typeLine(el, parts) {
+      el.after(cursor);
+      for (const [text, cls] of parts) {
+        const span = document.createElement("span");
+        if (cls) span.className = cls;
+        el.appendChild(span);
+        for (const ch of text) {
+          span.textContent += ch;
+          if (!reduce) await wait(70 + Math.random() * 90);
+        }
+      }
+    }
+
+    (async () => {
+      await wait(reduce ? 0 : 600);
+      for (let i = 0; i < lines.length; i++) {
+        await typeLine(targets[i], lines[i]);
+        if (i < lines.length - 1) await wait(reduce ? 0 : 500);
+      }
+    })();
+  </script>
 </body>
 </html>
