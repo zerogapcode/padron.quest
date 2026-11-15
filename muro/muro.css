@@ -1,0 +1,76 @@
+/* Muro — mismo sistema visual que la portada (océano / arena / ocre, Fraunces + Figtree). */
+:root {
+  --oceano: #13293D; --oceano-2: #1B3650; --oceano-3: #2E4D69;
+  --atlantico: #1F5673; --arena: #F5F0E8; --linea: #E6DDCE;
+  --tinta: #1C2A36; --tinta-suave: #56636E;
+  --ocre: #D9A55B; --ocre-oscuro: #8A5A1E; --ocre-claro: #F6E8D2;
+  --bruma: #C9D3DC; --bruma-2: #9FB0BE; --peligro: #B3402F;
+  --serif: "Fraunces", Georgia, serif;
+  --sans: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+body { min-height: 100vh; background: var(--arena); color: var(--tinta); font-family: var(--sans); font-size: 18px; line-height: 1.55; }
+[hidden] { display: none !important; }
+button, input, textarea { font: inherit; color: inherit; }
+h1, h2 { font-family: var(--serif); font-weight: 600; }
+
+/* Barra superior */
+.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between;
+       gap: 12px; padding: 10px 16px; min-height: 64px; background: var(--oceano); color: var(--arena); }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--arena); text-decoration: none; min-height: 44px; }
+.brand b { font-family: var(--serif); font-size: 22px; font-weight: 600; }
+.brand small { font-size: 11px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; color: var(--bruma); display: block; }
+.user { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.user img { width: 34px; height: 34px; border-radius: 50%; }
+#user-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 34vw; font-size: 16px; color: var(--bruma); }
+
+main { max-width: 680px; margin: 0 auto; padding: 20px 16px 48px; }
+.center { min-height: 72vh; display: grid; place-content: center; justify-items: center; text-align: center; gap: 18px; }
+.center h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1.1; letter-spacing: -.015em; color: var(--oceano); }
+.center p { max-width: 460px; }
+.center-text { text-align: center; padding: 28px 0; }
+.muted { color: var(--tinta-suave); }
+.small { font-size: 15px; }
+.error { color: var(--peligro); }
+.accent { font-style: italic; font-weight: 500; color: var(--ocre); }
+
+/* Botones (objetivo táctil grande) */
+.primary { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 54px; padding: 0 26px;
+           border: 0; border-radius: 14px; cursor: pointer; background: var(--ocre); color: var(--oceano); font-weight: 700; font-size: 18px; }
+.primary:hover { background: #E4B771; }
+.primary:disabled { opacity: .55; cursor: progress; }
+.ghost { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 16px;
+         background: transparent; border: 1px solid var(--linea); border-radius: 12px; cursor: pointer; font-weight: 600; }
+.ghost:hover { border-color: var(--bruma-2); }
+.top .ghost { border-color: rgba(245, 240, 232, .35); color: var(--arena); }
+button.small, .ghost.small { min-height: 38px; padding: 0 12px; font-size: 15px; }
+.primary.small { min-height: 44px; font-size: 16px; }
+
+/* Tarjetas */
+.card { background: #fff; border-radius: 20px; padding: 18px; box-shadow: 0 1px 0 var(--linea); }
+.composer textarea { width: 100%; resize: vertical; min-height: 90px; padding: 4px 2px; background: transparent; border: 0; outline: none; font-size: 18px; }
+.composer textarea::placeholder { color: var(--bruma-2); }
+.composer-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--linea); }
+.composer-actions .primary { margin-left: auto; }
+.photo-btn { cursor: pointer; }
+.preview { position: relative; margin-top: 10px; }
+.preview img { max-width: 100%; max-height: 360px; border-radius: 14px; display: block; }
+.preview button { position: absolute; top: 8px; right: 8px; background: rgba(19, 41, 61, .8); color: var(--arena); border: 0; }
+
+.admin { margin-top: 14px; background: var(--ocre-claro); }
+.admin summary { cursor: pointer; font-weight: 700; min-height: 32px; color: var(--ocre-oscuro); }
+.member-form { display: flex; gap: 8px; margin: 14px 0; }
+.member-form input { flex: 1; min-width: 0; min-height: 44px; background: #fff; border: 1px solid var(--linea); border-radius: 12px; padding: 0 12px; }
+.member-list { list-style: none; padding: 0; display: grid; }
+.member-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0;
+                  border-top: 1px solid rgba(138, 90, 30, .2); overflow-wrap: anywhere; }
+
+/* Muro */
+.feed { display: grid; gap: 14px; margin-top: 18px; }
+.post-head { display: flex; align-items: center; gap: 12px; }
+.post-head .post-delete { margin-left: auto; }
+.avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--linea); flex: none; object-fit: cover; }
+.post-name { font-weight: 700; color: var(--oceano); }
+.post-text { margin-top: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.post-text:empty { display: none; }
+.post-img { margin-top: 12px; width: 100%; height: auto; border-radius: 14px; display: block; }

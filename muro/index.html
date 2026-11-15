@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Muro · padron.quest</title>
+  <meta name="description" content="Muro privado de padron.quest">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#13293D">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='19' fill='%23D9A55B'/%3E%3Cpath d='M9 18c1-6 5.6-9 11-9s10 3 11 9c-3 .9-19 .9-22 0Z' fill='%2313293D'/%3E%3Cpath d='M18.4 31.5 18.9 22h2.2l.5 9.5Z' fill='%2313293D'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="muro.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/">
+      <svg width="38" height="38" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="19" fill="#D9A55B"/><path d="M9 18c1-6 5.6-9 11-9s10 3 11 9c-3 .9-19 .9-22 0Z" fill="#13293D"/><path d="M18.4 31.5 18.9 22h2.2l.5 9.5Z" fill="#13293D"/><path d="M20 23.5 14.5 18M20 23.5 25.5 18M20 23.5V17" stroke="#13293D" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>
+      <span><b>Padrón</b><small>Familia</small></span>
+    </a>
+    <div id="user" class="user" hidden>
+      <img id="user-photo" alt="" referrerpolicy="no-referrer">
+      <span id="user-name"></span>
+      <button id="btn-logout" class="ghost" type="button">Salir</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Cargando -->
+    <section id="view-loading" class="center">
+      <p class="muted">Cargando…</p>
+    </section>
+
+    <!-- Sin sesión -->
+    <section id="view-login" class="center" hidden>
+      <h1>El muro de la familia <span class="accent">Padrón</span></h1>
+      <p class="muted">Solo para familiares invitados. Entra con tu cuenta de Google.</p>
+      <button id="btn-login" class="primary" type="button">
+        <svg aria-hidden="true" viewBox="0 0 48 48" width="20" height="20"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+        Entrar con Google
+      </button>
+      <p id="login-error" class="error" hidden></p>
+    </section>
+
+    <!-- Sesión iniciada pero sin invitación -->
+    <section id="view-denied" class="center" hidden>
+      <h1>Aún no estás invitado</h1>
+      <p class="muted">La cuenta <strong id="denied-email"></strong> no está en la lista de miembros.<br>Pídele al administrador que te agregue y vuelve a intentarlo.</p>
+      <button id="btn-retry" class="primary" type="button">Volver a intentar</button>
+    </section>
+
+    <!-- Muro -->
+    <section id="view-wall" hidden>
+      <form id="composer" class="card composer">
+        <textarea id="post-text" maxlength="2000" rows="3" placeholder="¿Qué quieres compartir?"></textarea>
+        <div id="preview" class="preview" hidden>
+          <img id="preview-img" alt="Vista previa de la foto">
+          <button id="btn-remove-photo" class="ghost small" type="button" aria-label="Quitar foto">✕ Quitar</button>
+        </div>
+        <div class="composer-actions">
+          <label class="ghost photo-btn">
+            📷 Foto
+            <input id="post-photo" type="file" accept="image/*" hidden>
+          </label>
+          <span id="composer-status" class="muted small"></span>
+          <button id="btn-post" class="primary" type="submit">Publicar</button>
+        </div>
+      </form>
+
+      <details id="admin" class="card admin" hidden>
+        <summary>👑 Miembros invitados</summary>
+        <form id="member-form" class="member-form">
+          <input id="member-email" type="email" required placeholder="correo@gmail.com" autocomplete="off">
+          <button class="primary small" type="submit">Invitar</button>
+        </form>
+        <ul id="member-list" class="member-list"></ul>
+      </details>
+
+      <div id="feed" class="feed" aria-live="polite"></div>
+      <p id="feed-empty" class="muted center-text" hidden>Todavía no hay publicaciones. ¡Sé el primero!</p>
+    </section>
+  </main>
+
+  <template id="tpl-post">
+    <article class="card post">
+      <header class="post-head">
+        <img class="avatar" alt="" referrerpolicy="no-referrer">
+        <div>
+          <div class="post-name"></div>
+          <time class="post-time muted small"></time>
+        </div>
+        <button class="ghost small post-delete" type="button" hidden>Borrar</button>
+      </header>
+      <p class="post-text"></p>
+      <img class="post-img" alt="Foto de la publicación" loading="lazy" hidden>
+    </article>
+  </template>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
