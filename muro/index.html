@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Muro · padron.quest</title>
-  <meta name="description" content="Muro privado de padron.quest">
+  <title>Inicio · Familia Padrón</title>
+  <meta name="description" content="Muro privado de la familia Padrón">
   <meta name="robots" content="noindex">
   <meta name="theme-color" content="#13293D">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='19' fill='%23D9A55B'/%3E%3Cpath d='M9 18c1-6 5.6-9 11-9s10 3 11 9c-3 .9-19 .9-22 0Z' fill='%2313293D'/%3E%3Cpath d='M18.4 31.5 18.9 22h2.2l.5 9.5Z' fill='%2313293D'/%3E%3C/svg%3E">
@@ -15,88 +15,142 @@
 </head>
 <body>
   <header class="top">
-    <a class="brand" href="/">
-      <svg width="38" height="38" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="19" fill="#D9A55B"/><path d="M9 18c1-6 5.6-9 11-9s10 3 11 9c-3 .9-19 .9-22 0Z" fill="#13293D"/><path d="M18.4 31.5 18.9 22h2.2l.5 9.5Z" fill="#13293D"/><path d="M20 23.5 14.5 18M20 23.5 25.5 18M20 23.5V17" stroke="#13293D" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>
-      <span><b>Padrón</b><small>Familia</small></span>
-    </a>
-    <div id="user" class="user" hidden>
-      <img id="user-photo" alt="" referrerpolicy="no-referrer">
-      <span id="user-name"></span>
-      <a class="ghost" href="/arbol/" style="text-decoration:none">Árbol</a>
-      <button id="btn-logout" class="ghost" type="button">Salir</button>
+    <div class="top-in">
+      <a class="brand" href="/">
+        <svg width="38" height="38" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="19" fill="#D9A55B"/><path d="M9 18c1-6 5.6-9 11-9s10 3 11 9c-3 .9-19 .9-22 0Z" fill="#13293D"/><path d="M18.4 31.5 18.9 22h2.2l.5 9.5Z" fill="#13293D"/><path d="M20 23.5 14.5 18M20 23.5 25.5 18M20 23.5V17" stroke="#13293D" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>
+        <span><b>Padrón</b><small>Familia</small></span>
+      </a>
+      <nav class="nav" id="nav" aria-label="Principal" hidden>
+        <a href="/muro/" aria-current="page">Inicio</a>
+        <a href="/arbol/">Árbol <span class="nav-badge" id="navProposals" hidden></span></a>
+      </nav>
+      <div id="user" class="user" hidden>
+        <img id="user-photo" alt="" referrerpolicy="no-referrer">
+        <span id="user-name"></span>
+        <button id="btn-logout" class="ghost small" type="button">Salir</button>
+      </div>
     </div>
   </header>
 
-  <main>
-    <!-- Cargando -->
-    <section id="view-loading" class="center">
-      <p class="muted">Cargando…</p>
-    </section>
+  <!-- Cargando -->
+  <section id="view-loading" class="center">
+    <p class="muted">Cargando…</p>
+  </section>
 
-    <!-- Sin sesión -->
-    <section id="view-login" class="center" hidden>
-      <h1>El muro de la familia <span class="accent">Padrón</span></h1>
-      <p class="muted">Solo para familiares invitados. Entra con tu cuenta de Google.</p>
-      <button id="btn-login" class="primary" type="button">
-        <svg aria-hidden="true" viewBox="0 0 48 48" width="20" height="20"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
-        Entrar con Google
-      </button>
-      <p id="login-error" class="error" hidden></p>
-    </section>
+  <!-- Sin sesión -->
+  <section id="view-login" class="center" hidden>
+    <h1>El muro de la familia <span class="accent">Padrón</span></h1>
+    <p class="muted">Solo para familiares invitados. Entra con tu cuenta de Google.</p>
+    <button id="btn-login" class="primary" type="button">
+      <svg aria-hidden="true" viewBox="0 0 48 48" width="20" height="20"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+      Entrar con Google
+    </button>
+    <p id="login-error" class="error" hidden></p>
+  </section>
 
-    <!-- Sesión iniciada pero sin invitación -->
-    <section id="view-denied" class="center" hidden>
-      <h1>Aún no estás invitado</h1>
-      <p class="muted">La cuenta <strong id="denied-email"></strong> no está en la lista de miembros.<br>Pídele al administrador que te agregue y vuelve a intentarlo.</p>
-      <button id="btn-retry" class="primary" type="button">Volver a intentar</button>
-    </section>
+  <!-- Sesión iniciada pero sin invitación -->
+  <section id="view-denied" class="center" hidden>
+    <h1>Aún no estás invitado</h1>
+    <p class="muted">La cuenta <strong id="denied-email"></strong> no está en la lista de familiares.<br>Pídele a un administrador que te agregue y vuelve a intentarlo.</p>
+    <button id="btn-retry" class="primary" type="button">Volver a intentar</button>
+  </section>
 
-    <!-- Muro -->
-    <section id="view-wall" hidden>
-      <form id="composer" class="card composer">
-        <textarea id="post-text" maxlength="2000" rows="3" placeholder="¿Qué quieres compartir?"></textarea>
+  <!-- Muro -->
+  <main id="view-wall" class="layout" hidden>
+    <div class="col-feed">
+      <section class="saludo" aria-labelledby="saludo-titulo">
+        <div class="saludo-in">
+          <span class="saludo-fecha" id="saludo-fecha"></span>
+          <h1 id="saludo-titulo"><span id="saludo-hola">Hola</span>, <span class="accent" id="saludo-nombre"></span></h1>
+          <p id="saludo-resumen"></p>
+          <div class="saludo-acciones">
+            <button type="button" class="primary small" id="btn-ir-compartir">Compartir algo</button>
+            <a class="ghost light" href="/arbol/">Ver el árbol</a>
+          </div>
+        </div>
+        <svg class="saludo-paisaje" viewBox="0 0 1000 110" aria-hidden="true">
+          <circle cx="820" cy="58" r="56" fill="#D9A55B" opacity=".1"/>
+          <circle cx="820" cy="58" r="30" fill="#D9A55B" opacity=".88"/>
+          <path d="M0 86 160 78l140-16 120-22 50-18 16-4 16 4 58 22 140 26 160 12 140 6v22H0Z" fill="#1F3B55"/>
+          <path d="m462 26 8-4 16-4 16 4 10 6-12-1-10 3-12-3Z" fill="#F5F0E8" opacity=".3"/>
+          <path d="M0 100c200-8 400-4 600-6s300 2 400 4v12H0Z" fill="#0F2234"/>
+          <path d="M118 100c.6-6 1-10 2.6-14h3.4c1.6 4 2 8 2.6 14Z" fill="#0F2234"/>
+          <path d="M104 88c1-8 9-13 18-13s17 5 18 13c-5 1.6-31 1.6-36 0Z" fill="#0F2234"/>
+          <path d="M790 104h60M802 108h36" stroke="#D9A55B" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+        </svg>
+      </section>
+
+      <form id="composer" class="card composer" aria-label="Compartir con la familia">
+        <div class="composer-row">
+          <span class="avatar-ini" id="composer-avatar" aria-hidden="true"></span>
+          <label for="post-text" class="sr-only">Escribe una publicación para la familia</label>
+          <textarea id="post-text" maxlength="2000" rows="2" placeholder="Comparte algo con la familia Padrón…"></textarea>
+        </div>
         <div id="preview" class="preview" hidden>
           <img id="preview-img" alt="Vista previa de la foto">
-          <button id="btn-remove-photo" class="ghost small" type="button" aria-label="Quitar foto">✕ Quitar</button>
+          <button id="btn-remove-photo" class="ghost small" type="button">Quitar foto</button>
         </div>
         <div class="composer-actions">
-          <label class="ghost photo-btn">
-            📷 Foto
-            <input id="post-photo" type="file" accept="image/*" hidden>
+          <label class="chip chip-azul" for="post-photo">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="3"/><circle cx="8.5" cy="10" r="1.6"/><path d="m4 17 5-4.5 3.5 3 3-2.5L20 17"/></svg>
+            Foto
           </label>
-          <span id="composer-status" class="muted small"></span>
-          <button id="btn-post" class="primary" type="submit">Publicar</button>
+          <input id="post-photo" class="sr-only" type="file" accept="image/*">
+          <span id="composer-status" class="muted small" role="status"></span>
+          <button id="btn-post" class="primary small" type="submit">Publicar</button>
         </div>
       </form>
 
-      <details id="admin" class="card admin" hidden>
-        <summary>👑 Miembros invitados</summary>
+      <div class="filtros" role="group" aria-label="Qué mostrar">
+        <button type="button" class="filtro" data-filtro="todo" aria-pressed="true">Toda la familia</button>
+        <button type="button" class="filtro" data-filtro="fotos" aria-pressed="false">Fotos</button>
+        <button type="button" class="filtro" data-filtro="mias" aria-pressed="false">Mis publicaciones</button>
+      </div>
+
+      <div id="feed" class="feed" aria-live="polite"></div>
+      <p id="feed-empty" class="card muted center-text" hidden>Todavía no hay publicaciones aquí. ¡Sé el primero en compartir algo!</p>
+    </div>
+
+    <aside class="col-side" aria-label="La familia esta semana">
+      <section class="card cumple" id="cumples" aria-labelledby="cumples-titulo">
+        <h2 id="cumples-titulo" class="mini-titulo">Próximos cumpleaños</h2>
+        <div id="cumple-destacado"></div>
+        <ul id="cumple-lista" class="lista-simple"></ul>
+        <p id="cumple-vacio" class="muted small" hidden>Cuando el árbol tenga fechas de nacimiento, aquí aparecerán los próximos cumpleaños.</p>
+      </section>
+
+      <section class="card" id="mi-ficha" aria-labelledby="mi-ficha-titulo">
+        <h2 id="mi-ficha-titulo" class="titulo-tarjeta">Tu lugar en el árbol</h2>
+        <ol id="mi-rama" class="rama"></ol>
+        <p id="mi-ficha-vacia" class="muted small" hidden>Todavía no estás vinculado a tu ficha del árbol. Pídeselo a un administrador.</p>
+        <a class="enlace" href="/arbol/">Ver el árbol completo</a>
+      </section>
+
+      <section class="card" id="completar" aria-labelledby="completar-titulo">
+        <h2 id="completar-titulo" class="titulo-tarjeta">Completemos el árbol</h2>
+        <div id="barras"></div>
+        <p class="muted small">Lo que propongas en el árbol lo revisa un administrador antes de que lo vea toda la familia.</p>
+        <a class="boton-suave" href="/arbol/">Ver qué falta</a>
+      </section>
+
+      <section class="card admin" id="admin" aria-labelledby="admin-titulo" hidden>
+        <h2 id="admin-titulo" class="titulo-tarjeta">Familiares invitados <span class="muted small" id="member-count"></span></h2>
         <form id="member-form" class="member-form">
+          <label for="member-email" class="sr-only">Correo de Google del familiar</label>
           <input id="member-email" type="email" required placeholder="correo@gmail.com" autocomplete="off">
+          <label for="member-person" class="sr-only">Su ficha en el árbol</label>
+          <select id="member-person"></select>
           <button class="primary small" type="submit">Invitar</button>
         </form>
         <ul id="member-list" class="member-list"></ul>
-      </details>
-
-      <div id="feed" class="feed" aria-live="polite"></div>
-      <p id="feed-empty" class="muted center-text" hidden>Todavía no hay publicaciones. ¡Sé el primero!</p>
-    </section>
+      </section>
+    </aside>
   </main>
 
-  <template id="tpl-post">
-    <article class="card post">
-      <header class="post-head">
-        <img class="avatar" alt="" referrerpolicy="no-referrer">
-        <div>
-          <div class="post-name"></div>
-          <time class="post-time muted small"></time>
-        </div>
-        <button class="ghost small post-delete" type="button" hidden>Borrar</button>
-      </header>
-      <p class="post-text"></p>
-      <img class="post-img" alt="Foto de la publicación" loading="lazy" hidden>
-    </article>
-  </template>
+  <dialog id="foto-grande" class="foto-grande" aria-label="Foto ampliada">
+    <img id="foto-grande-img" alt="">
+    <button type="button" class="ghost small" id="btn-cerrar-foto">Cerrar</button>
+  </dialog>
 
   <script type="module" src="app.js"></script>
 </body>
