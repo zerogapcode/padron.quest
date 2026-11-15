@@ -17,11 +17,23 @@
             object-fit:contain; filter:drop-shadow(0 20px 40px rgba(0,0,0,.45)); }
     @media (max-width: 700px) {
       main { flex-direction:column; text-align:center; }
+      .units { justify-content:center; }
+      .unit { min-width:0; flex:1 1 0; }
       .hero { height:auto; width:min(70vw,320px); max-width:none; }
     }
     h1 { font-size:clamp(2.2rem,8vw,4.5rem); letter-spacing:-.03em; min-height:1.2em; }
     .accent { color:var(--accent); }
     p { color:var(--muted); margin-top:.75rem; font-size:1.1rem; min-height:1.5em; }
+    .countdown { margin-top:2rem; opacity:0; transform:translateY(8px); transition:opacity .6s, transform .6s; }
+    .countdown.show { opacity:1; transform:none; }
+    .units { display:flex; gap:clamp(.5rem,2vw,1rem); }
+    .unit { background:#1a1c23; border:1px solid #2a2d37; border-radius:12px;
+            padding:.75rem .5rem; min-width:4.5rem; text-align:center; }
+    .num { display:block; font-size:clamp(1.6rem,5vw,2.4rem); font-weight:700;
+           font-variant-numeric:tabular-nums; color:var(--fg); }
+    .lbl { display:block; font-size:.75rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-top:.25rem; }
+    .when { margin-top:.9rem; font-size:.95rem; color:var(--muted); }
+    .when strong { color:var(--accent); font-weight:600; }
     .cursor { display:inline-block; width:.08em; min-width:2px; height:1em; margin-left:.06em;
               background:var(--accent); vertical-align:-.1em; animation:blink 1s steps(1) infinite; }
     @keyframes blink { 50% { opacity:0; } }
@@ -33,6 +45,15 @@
     <div class="text">
       <h1 aria-label="padron.quest"><span class="typed" aria-hidden="true"></span></h1>
       <p aria-label="Próximamente."><span class="typed" aria-hidden="true"></span></p>
+      <section class="countdown" aria-label="Cuenta regresiva">
+        <div class="units" role="timer" aria-live="off">
+          <div class="unit"><span class="num" id="d">0</span><span class="lbl">días</span></div>
+          <div class="unit"><span class="num" id="h">00</span><span class="lbl">horas</span></div>
+          <div class="unit"><span class="num" id="m">00</span><span class="lbl">min</span></div>
+          <div class="unit"><span class="num" id="s">00</span><span class="lbl">seg</span></div>
+        </div>
+        <p class="when" id="when"></p>
+      </section>
     </div>
     <img class="hero" src="papa.png" width="1054" height="1492"
          alt="Hombre mayor con casco amarillo, chaleco reflectante y un pico al hombro">
@@ -63,12 +84,50 @@
       }
     }
 
+    // ---- Cuenta regresiva ----
+    // Domingo 15 de noviembre de 2026, 6:00 p. m. en Miami (EST, UTC-5).
+    // Es un instante absoluto: cada visitante ve el tiempo correcto en su zona horaria.
+    const TARGET = new Date("2026-11-15T18:00:00-05:00");
+    const cd = document.querySelector(".countdown");
+    const el = id => document.getElementById(id);
+    const pad = n => String(n).padStart(2, "0");
+
+    const fmt = (tz) => new Intl.DateTimeFormat("es", {
+      weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit", hour12: true,
+      ...(tz ? { timeZone: tz } : {})
+    }).format(TARGET);
+    const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const miami = fmt("America/New_York");
+    const local = fmt();
+    el("when").innerHTML = (userTz === "America/New_York" || miami === local)
+      ? `<strong>${miami}</strong> (hora de Miami)`
+      : `<strong>${local}</strong> en tu hora local · ${miami} en Miami`;
+
+    function tick() {
+      const diff = TARGET - Date.now();
+      if (diff <= 0) {
+        cd.querySelector(".units").hidden = true;
+        el("when").innerHTML = "<strong>¡Ya es la hora!</strong>";
+        clearInterval(timer);
+        return;
+      }
+      const s = Math.floor(diff / 1000);
+      el("d").textContent = Math.floor(s / 86400);
+      el("h").textContent = pad(Math.floor(s / 3600) % 24);
+      el("m").textContent = pad(Math.floor(s / 60) % 60);
+      el("s").textContent = pad(s % 60);
+    }
+    const timer = setInterval(tick, 1000);
+    tick();
+
     (async () => {
       await wait(reduce ? 0 : 600);
       for (let i = 0; i < lines.length; i++) {
         await typeLine(targets[i], lines[i]);
         if (i < lines.length - 1) await wait(reduce ? 0 : 500);
       }
+      await wait(reduce ? 0 : 300);
+      cd.classList.add("show");
     })();
   </script>
 </body>
