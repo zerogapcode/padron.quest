@@ -10,9 +10,9 @@ import {
   query, where, orderBy, limit, onSnapshot, serverTimestamp, arrayUnion, arrayRemove, writeBatch,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
 import {
-  ref, uploadBytes, getDownloadURL, deleteObject,
+  ref, deleteObject,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-storage.js";
-import { auth, db, storage, EMULADOR, avisar, montarCampana, montarContadorMensajes, fotoPerfil, nombrePerfil } from "/comun/base.js";
+import { auth, db, storage, EMULADOR, avisar, montarCampana, montarContadorMensajes, fotoPerfil, nombrePerfil, comprimirFoto, subirFoto } from "/comun/base.js";
 
 if (EMULADOR) window.__db = { db, doc, updateDoc, arrayUnion, setDoc, getDoc };
 
@@ -507,7 +507,7 @@ $("post-photo").addEventListener("change", async (e) => {
   if (!file) return;
   setStatus("Preparando foto…");
   try {
-    pendingImage = await compressImage(file);
+    pendingImage = await comprimirFoto(file);
     if (previewURL) URL.revokeObjectURL(previewURL);
     previewURL = URL.createObjectURL(pendingImage);
     $("preview-img").src = previewURL;
@@ -516,7 +516,7 @@ $("post-photo").addEventListener("change", async (e) => {
   } catch (err) {
     console.error(err);
     pendingImage = null;
-    setStatus("No se pudo leer la foto.");
+    setStatus(err.message || "No se pudo leer la foto.");
   }
 });
 $("btn-remove-photo").addEventListener("click", () => { pendingImage = null; $("preview").hidden = true; });
@@ -531,11 +531,7 @@ $("composer").addEventListener("submit", async (e) => {
     let imageURL = null, imagePath = null;
     if (pendingImage) {
       setStatus("Subiendo foto…");
-      const rand = Math.random().toString(36).slice(2, 10);
-      imagePath = `posts/${user.uid}/${Date.now()}-${rand}.jpg`;
-      const objRef = ref(storage, imagePath);
-      await uploadBytes(objRef, pendingImage, { contentType: "image/jpeg", cacheControl: "public, max-age=31536000" });
-      imageURL = await getDownloadURL(objRef);
+      ({ url: imageURL, path: imagePath } = await subirFoto(pendingImage, "posts", user.uid));
     }
     setStatus("Publicando…");
     await addDoc(collection(db, "posts"), {
@@ -560,37 +556,6 @@ $("composer").addEventListener("submit", async (e) => {
     $("btn-post").disabled = false;
   }
 });
-
-// Reduce la foto en el navegador antes de subirla (máximo 2048 px, JPEG < 4 MB).
-// Al redibujarla en un canvas se descartan los metadatos (incluida la ubicación GPS).
-const MAX_SIDE = 2048;
-const MAX_BYTES = 4 * 1024 * 1024;
-const toBlob = (canvas, q) => new Promise((res) => canvas.toBlob(res, "image/jpeg", q));
-async function compressImage(file) {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = new Image();
-    img.src = url;
-    await img.decode();
-    let side = MAX_SIDE;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const scale = Math.min(1, side / Math.max(img.naturalWidth, img.naturalHeight));
-      const w = Math.round(img.naturalWidth * scale);
-      const hgt = Math.round(img.naturalHeight * scale);
-      const canvas = document.createElement("canvas");
-      canvas.width = w; canvas.height = hgt;
-      canvas.getContext("2d").drawImage(img, 0, 0, w, hgt);
-      for (const quality of [0.85, 0.72]) {
-        const blob = await toBlob(canvas, quality);
-        if (blob && blob.size < MAX_BYTES) return blob;
-      }
-      side = Math.round(side * 0.75);
-    }
-    throw new Error("La foto es demasiado grande incluso comprimida");
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Columna lateral: cumpleaños, tu rama, completar el árbol

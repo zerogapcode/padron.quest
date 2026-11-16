@@ -122,7 +122,7 @@ function pintarPersona() {
 }
 
 async function subirVarias(archivos, album, estado) {
-  let ok = 0;
+  let ok = 0, motivo = "";
   for (const [i, file] of archivos.entries()) {
     estado.textContent = `Subiendo ${i + 1} de ${archivos.length}…`;
     try {
@@ -134,9 +134,10 @@ async function subirVarias(archivos, album, estado) {
       ok++;
     } catch (err) {
       console.error(err);
+      if (!motivo) motivo = `«${file.name}»: ${err.message || err.code || "error"}`;
     }
   }
-  estado.textContent = ok === archivos.length ? `Listo: ${ok} ${ok === 1 ? "foto subida" : "fotos subidas"}. Ábrelas para ponerles pie y etiquetar a quien aparece.` : `Se subieron ${ok} de ${archivos.length}.`;
+  estado.textContent = ok === archivos.length ? `Listo: ${ok} ${ok === 1 ? "foto subida" : "fotos subidas"}. Ábrelas para ponerles pie y etiquetar a quien aparece.` : `Se subieron ${ok} de ${archivos.length}.${motivo ? " " + motivo : ""}`;
 }
 
 function verFoto(f) {

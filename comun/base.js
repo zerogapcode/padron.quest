@@ -107,39 +107,86 @@ export function parseFecha(texto) {
   return null;
 }
 
-// Reduce una foto en el navegador (máx. 2048 px, JPEG < 4 MB); al redibujarla se pierden los metadatos GPS.
-export async function comprimirFoto(file, maxSide = 2048) {
-  const MAX_BYTES = 4 * 1024 * 1024;
-  const toBlob = (canvas, q) => new Promise((res) => canvas.toBlob(res, "image/jpeg", q));
+// ---------------------------------------------------------------------------
+// Fotos: se comprimen SIEMPRE en el navegador antes de subirlas, para que el
+// almacenamiento de Firebase no crezca sin control.
+// - Lado mayor ≤ 1600 px (se ve nítida en cualquier teléfono o computadora).
+// - WebP (o JPEG en navegadores que no saben generar WebP).
+// - Objetivo ≈ 300 KB por foto; nunca más de 900 KB (las reglas de Storage rechazan ≥ 1 MB).
+// - Al redibujarla en un canvas se pierden los metadatos, incluida la ubicación GPS.
+// Una foto de teléfono de 3–6 MB queda en unos 150–350 KB: 5 GB alcanzan para ~15.000 fotos.
+// ---------------------------------------------------------------------------
+export const FOTO = { maxLado: 1600, minLado: 720, objetivo: 300 * 1024, maximo: 900 * 1024, calidades: [0.8, 0.7, 0.6] };
+
+let formatoFoto = null;
+async function formatoDeFoto() {
+  if (formatoFoto) return formatoFoto;
+  const c = document.createElement("canvas");
+  c.width = c.height = 2;
+  const b = await new Promise((res) => c.toBlob(res, "image/webp", 0.8));
+  formatoFoto = b && b.type === "image/webp" ? "image/webp" : "image/jpeg";
+  return formatoFoto;
+}
+
+async function decodificarFoto(file) {
+  // createImageBitmap respeta la orientación de la cámara (EXIF) y gasta menos memoria.
+  if (typeof createImageBitmap === "function") {
+    try { return await createImageBitmap(file, { imageOrientation: "from-image" }); } catch { /* sigue con <img> */ }
+  }
   const url = URL.createObjectURL(file);
   try {
     const img = new Image();
     img.src = url;
     await img.decode();
-    let side = maxSide;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const scale = Math.min(1, side / Math.max(img.naturalWidth, img.naturalHeight));
-      const w = Math.round(img.naturalWidth * scale), hgt = Math.round(img.naturalHeight * scale);
-      const canvas = document.createElement("canvas");
-      canvas.width = w; canvas.height = hgt;
-      canvas.getContext("2d").drawImage(img, 0, 0, w, hgt);
-      for (const q of [0.85, 0.72]) {
-        const blob = await toBlob(canvas, q);
-        if (blob && blob.size < MAX_BYTES) return blob;
-      }
-      side = Math.round(side * 0.75);
-    }
-    throw new Error("La foto es demasiado grande incluso comprimida");
+    return img;
   } finally {
     URL.revokeObjectURL(url);
   }
 }
 
+export async function comprimirFoto(file, maxLado = FOTO.maxLado) {
+  if (!file || (file.type && !file.type.startsWith("image/"))) throw new Error("Ese archivo no es una foto.");
+  const tipo = await formatoDeFoto();
+  let img;
+  try { img = await decodificarFoto(file); } catch { throw new Error("No se pudo leer la foto (prueba con una JPG o PNG)."); }
+  const ancho = img.width || img.naturalWidth, alto = img.height || img.naturalHeight;
+  if (!ancho || !alto) throw new Error("No se pudo leer la foto.");
+  let lado = Math.min(maxLado, Math.max(ancho, alto));
+  let mejor = null;
+  try {
+    for (;;) {
+      const escala = lado / Math.max(ancho, alto);
+      const w = Math.max(1, Math.round(ancho * escala)), hgt = Math.max(1, Math.round(alto * escala));
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = hgt;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff"; // las transparencias (PNG) quedan blancas, no negras
+      ctx.fillRect(0, 0, w, hgt);
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, 0, 0, w, hgt);
+      for (const q of FOTO.calidades) {
+        const blob = await new Promise((res) => canvas.toBlob(res, tipo, q));
+        if (!blob) continue;
+        if (blob.size <= FOTO.objetivo) return blob;
+        if (blob.size <= FOTO.maximo && (!mejor || blob.size < mejor.size)) mejor = blob;
+      }
+      canvas.width = canvas.height = 0; // libera memoria en teléfonos modestos
+      if (lado <= FOTO.minLado) break;
+      lado = Math.max(FOTO.minLado, Math.round(lado * 0.8));
+    }
+  } finally {
+    if (typeof img.close === "function") img.close();
+  }
+  if (mejor) return mejor;
+  throw new Error("La foto es demasiado pesada incluso comprimida.");
+}
+
 export async function subirFoto(blob, carpeta, uid) {
+  const tipo = blob.type === "image/webp" ? "image/webp" : "image/jpeg";
   const rand = Math.random().toString(36).slice(2, 10);
-  const path = `${carpeta}/${uid}/${Date.now()}-${rand}.jpg`;
+  const path = `${carpeta}/${uid}/${Date.now()}-${rand}.${tipo === "image/webp" ? "webp" : "jpg"}`;
   const objRef = ref(storage, path);
-  await uploadBytes(objRef, blob, { contentType: "image/jpeg", cacheControl: "public, max-age=31536000" });
+  await uploadBytes(objRef, blob, { contentType: tipo, cacheControl: "public, max-age=31536000" });
   return { path, url: await getDownloadURL(objRef) };
 }
 
