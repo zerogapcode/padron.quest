@@ -325,7 +325,7 @@
       <div class="unirse-panel">
         <div class="unirse-texto">
           <h2 id="titulo-unirse">¿Eres <span class="serif-acento">Padrón</span> o <span class="serif-acento">Perera</span>?</h2>
-          <p>Cualquier descendiente de Genaro Padrón Luis, y su pareja, puede pedir su invitación. La red la administra la propia familia y abre por etapas.</p>
+          <p>Cualquier descendiente de los Padrón o de los Perera, y su pareja, puede pedir su invitación. La red la administra la propia familia y abre por etapas.</p>
           <ol class="pasos">
             <li><span>1</span><span>Pide tu invitación y di qué correo de Google usas</span></li>
             <li><span>2</span><span>Un administrador de la familia te agrega</span></li>
@@ -364,9 +364,10 @@
 
   <script>
     // ---- Contacto para pedir invitación ----
-    // Rellena UNO de los dos. WhatsApp: solo dígitos con código de país (ej. "584141234567").
-    const WHATSAPP = "";
-    const CORREO = "";
+    // Las invitaciones las atiende Carmen Luisa, administradora de la red.
+    // WhatsApp: solo dígitos con código de país.
+    const WHATSAPP = "584144268290";
+    const CORREO = "florez.carmenluisa" + "@" + "gmail.com";
     const MENSAJE = "Hola, soy de la familia Padrón Perera y quiero mi invitación a padron.quest.\nMi nombre: \nMi correo de Google: ";
 
     (function contacto() {
@@ -375,7 +376,13 @@
       if (WHATSAPP) {
         boton.href = "https://wa.me/" + WHATSAPP + "?text=" + encodeURIComponent(MENSAJE);
         boton.target = "_blank"; boton.rel = "noopener";
-        nota.textContent = "Te abrirá WhatsApp con el mensaje listo.";
+        nota.append("Te atiende Carmen Luisa por WhatsApp, con el mensaje ya escrito.");
+        if (CORREO) {
+          const a = document.createElement("a");
+          a.href = "mailto:" + CORREO + "?subject=" + encodeURIComponent("Invitación a padron.quest") + "&body=" + encodeURIComponent(MENSAJE);
+          a.textContent = CORREO;
+          nota.append(document.createElement("br"), "¿Prefieres correo? Escribe a ", a);
+        }
       } else if (CORREO) {
         boton.href = "mailto:" + CORREO + "?subject=" + encodeURIComponent("Invitación a padron.quest") + "&body=" + encodeURIComponent(MENSAJE);
         nota.textContent = "O escribe a " + CORREO;
