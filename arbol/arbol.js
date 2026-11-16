@@ -11,11 +11,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 import {
   collection, doc, getDoc, getDocs, onSnapshot, query, where, limit, orderBy,
-  writeBatch, serverTimestamp, addDoc, deleteDoc, setDoc,
+  writeBatch, serverTimestamp, addDoc, deleteDoc, setDoc, updateDoc,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
 import { auth, db, EMULADOR, avisar, montarCampana, montarContadorMensajes } from "/comun/base.js";
 
-if (EMULADOR) window.__db = { db, doc, setDoc, getDoc };
+// Solo con los emuladores locales: acceso directo para probar que las reglas niegan lo que deben.
+if (EMULADOR) window.__db = { db, doc, setDoc, getDoc, getDocs, updateDoc, collection, query, where, serverTimestamp };
 
 // ---------------------------------------------------------------------------
 // Estado
@@ -44,6 +45,11 @@ const state = {
   zoom: 0.8,
   nodePositions: new Map(),
   firstRenderDone: false,
+  // Persona pedida en la URL (/arbol/?persona=<id>): se aplica una sola vez, al cargar.
+  urlPersona: new URLSearchParams(location.search).get("persona"),
+  openedFromUrl: false,
+  // Propuesta que el admin está corrigiendo en el formulario ("Corregir y aprobar").
+  correcting: null,
 };
 const unsubs = [];
 
@@ -67,11 +73,24 @@ const myEmail = () => (state.user?.email || "").toLowerCase();
 function showToast(message) {
   const container = $("toastContainer");
   if (!container) return;
+  // Con un diálogo modal abierto, el aviso tiene que ir dentro de él (capa superior);
+  // si no, lo tapan el fondo oscuro y el propio diálogo.
+  const host = document.querySelector("dialog[open]") || document.body;
+  if (container.parentElement !== host) host.appendChild(container);
   const el = document.createElement("div");
   el.className = "toast-msg";
   el.textContent = message;
   container.appendChild(el);
   setTimeout(() => el.remove(), 3600);
+}
+
+// Mensaje de error en español para un familiar (nunca el código en inglés solo).
+function errorText(err) {
+  const code = err?.code || "";
+  if (code === "permission-denied") return "no tienes permiso para hacerlo o alguien acaba de cambiarlo. Recarga la página e inténtalo otra vez.";
+  if (code === "unavailable" || code === "deadline-exceeded") return "no hay conexión. Inténtalo de nuevo en un momento.";
+  if (code === "not-found") return "ese dato ya no existe.";
+  return "algo salió mal" + (code ? ` (${code})` : "") + ". Inténtalo otra vez.";
 }
 
 function getPerson(id) {
@@ -250,13 +269,19 @@ async function enter(user) {
       return;
     }
     showGate(null);
+    if (state.urlPersona) {
+      const pedida = getPerson(state.urlPersona);
+      state.urlPersona = null;
+      if (pedida) { state.focusPersonId = pedida.id; state.selectedPersonId = pedida.id; state.openedFromUrl = true; }
+    }
     if (!state.focusPersonId || !getPerson(state.focusPersonId)) state.focusPersonId = state.rootId && getPerson(state.rootId) ? state.rootId : state.people[0].id;
     if (!state.selectedPersonId || !getPerson(state.selectedPersonId)) state.selectedPersonId = state.focusPersonId;
     refreshAll();
     if (!state.firstRenderDone) {
       state.firstRenderDone = true;
       // En pantallas pequeñas la ficha tapa el árbol: empieza cerrada y se abre al tocar a alguien.
-      if (window.matchMedia("(max-width: 900px)").matches) $("inspectorDrawer").classList.add("closed");
+      // Si se llegó con un enlace a una persona, su ficha se muestra abierta.
+      if (window.matchMedia("(max-width: 900px)").matches && !state.openedFromUrl) $("inspectorDrawer").classList.add("closed");
       // Arranca legible, centrado en la raíz; "Ver todo" muestra el árbol entero.
       setTimeout(() => {
         centerTreeOnPerson(state.focusPersonId, window.innerWidth < 760 ? 0.6 : 0.85);
@@ -899,31 +924,45 @@ function renderProposalsView() {
   container.innerHTML = list.map((pr) => {
     const after = pr.after || {};
     const before = pr.before || {};
-    const keys = Object.keys(after).filter((k) => k in FIELD_LABELS);
+    // Si un admin corrigió la propuesta al aprobarla, `final` guarda lo que quedó publicado.
+    const corrected = pr.status === "approved" && pr.corrected === true && pr.final && typeof pr.final === "object";
+    const final = corrected ? pr.final : null;
+    const keys = [...new Set([...Object.keys(after), ...(final ? Object.keys(final) : [])])].filter((k) => k in FIELD_LABELS);
     const created = pr.createdAt?.toDate ? pr.createdAt.toDate() : null;
-    const statusText = pr.status === "pending" ? "Pendiente" : pr.status === "approved" ? "Aprobada" : "Rechazada";
+    const statusText = pr.status === "pending" ? "Pendiente" : pr.status === "approved" ? (corrected ? "Aprobada con correcciones" : "Aprobada") : "Rechazada";
     const mine = pr.uid === state.user?.uid;
+    // Si el admin corrigió el nombre, el título muestra el que quedó (no la errata propuesta).
+    const title = (final && typeof final.name === "string" && final.name) || pr.personName || after.name || "";
+    const showBefore = pr.kind !== "add";
+    const changedByAdmin = (k) => final && JSON.stringify(final[k] ?? null) !== JSON.stringify(after[k] ?? null);
+    const finalCell = (k) => {
+      if (!final) return "";
+      const v = k in final ? final[k] : (showBefore ? before[k] : undefined);
+      return `<td class="final ${changedByAdmin(k) ? "fixed" : ""}">${escapeHtml(formatFieldValue(k, v))}${changedByAdmin(k) ? ` <span class="fixed-tag">corregido</span>` : ""}</td>`;
+    };
     return `
       <article class="proposal-card" data-proposal-id="${escapeHtml(pr.id)}">
         <div class="proposal-head">
           <span class="proposal-kind ${pr.kind === "add" ? "add" : ""}">${pr.kind === "add" ? "Nueva persona" : "Cambio de datos"}</span>
-          <h3>${escapeHtml(pr.personName || after.name || "")}</h3>
+          <h3>${escapeHtml(title)}</h3>
           <span class="proposal-status ${escapeHtml(pr.status)}">${statusText}</span>
         </div>
         <div class="proposal-meta">Propuesta por ${escapeHtml(pr.name || pr.email)}${created ? " · " + escapeHtml(timeAgo(created)) : ""}</div>
         <table class="diff-table">
-          <thead><tr><th>Dato</th>${pr.kind === "add" ? "" : "<th>Hoy en el árbol</th>"}<th>Propuesto</th></tr></thead>
+          <thead><tr><th scope="col">Dato</th>${showBefore ? `<th scope="col">${pr.status === "pending" ? "Hoy en el árbol" : "Antes"}</th>` : ""}<th scope="col">Propuesto</th>${final ? `<th scope="col">Quedó así</th>` : ""}</tr></thead>
           <tbody>
-            ${keys.map((k) => `<tr><td>${escapeHtml(FIELD_LABELS[k])}</td>${pr.kind === "add" ? "" : `<td class="before">${escapeHtml(formatFieldValue(k, before[k]))}</td>`}<td class="after">${escapeHtml(formatFieldValue(k, after[k]))}</td></tr>`).join("")}
+            ${keys.map((k) => `<tr><td>${escapeHtml(FIELD_LABELS[k])}</td>${showBefore ? `<td class="before">${escapeHtml(formatFieldValue(k, k in before ? before[k] : pr.finalBefore?.[k]))}</td>` : ""}<td class="${final ? "" : "after"}">${escapeHtml(k in after ? formatFieldValue(k, after[k]) : "—")}</td>${finalCell(k)}</tr>`).join("")}
           </tbody>
         </table>
+        ${corrected ? `<p class="proposal-note corrected-note">Un administrador corrigió algunos datos antes de publicarla. La columna «Quedó así» muestra lo que está ahora en el árbol.</p>` : ""}
         ${pr.note ? `<p class="proposal-note"><strong>Fuente o comentario:</strong> ${escapeHtml(pr.note)}</p>` : ""}
-        ${pr.status !== "pending" && (pr.decisionNote || pr.decidedBy) ? `<p class="proposal-note"><strong>${pr.status === "approved" ? "Aprobada" : "Rechazada"}${pr.decidedBy ? " por " + escapeHtml(pr.decidedBy) : ""}.</strong> ${escapeHtml(pr.decisionNote || "")}</p>` : ""}
+        ${pr.status !== "pending" && (pr.decisionNote || pr.decidedBy) ? `<p class="proposal-note"><strong>${pr.status === "approved" ? (corrected ? "Aprobada con correcciones" : "Aprobada") : "Rechazada"}${pr.decidedBy ? " por " + escapeHtml(pr.decidedBy) : ""}.</strong> ${escapeHtml(pr.decisionNote || "")}</p>` : ""}
         ${pr.status === "pending" && state.isAdmin ? `
           <div class="proposal-actions">
             <label class="sr-only" for="dn-${escapeHtml(pr.id)}">Nota para quien la propuso</label>
             <textarea id="dn-${escapeHtml(pr.id)}" data-decision-note placeholder="Nota para quien la propuso (opcional)"></textarea>
             <button type="button" class="btn btn-primary" data-approve>Aprobar y publicar</button>
+            <button type="button" class="btn" data-correct>Corregir y aprobar</button>
             <button type="button" class="btn" data-reject>Rechazar</button>
           </div>` : ""}
         ${pr.status === "pending" && mine && !state.isAdmin ? `<div class="proposal-actions"><button type="button" class="btn btn-sm" data-withdraw>Retirar mi propuesta</button></div>` : ""}
@@ -936,10 +975,11 @@ function renderProposalsView() {
     const note = () => card.querySelector("[data-decision-note]")?.value.trim() || "";
     card.querySelector("[data-approve]")?.addEventListener("click", (e) => decideProposal(pr, "approved", note(), e.currentTarget));
     card.querySelector("[data-reject]")?.addEventListener("click", (e) => decideProposal(pr, "rejected", note(), e.currentTarget));
+    card.querySelector("[data-correct]")?.addEventListener("click", () => openCorrectProposalModal(pr, note()));
     card.querySelector("[data-withdraw]")?.addEventListener("click", async () => {
       if (!confirm("¿Retirar esta propuesta?")) return;
       try { await deleteDoc(doc(db, "proposals", pr.id)); showToast("Propuesta retirada."); }
-      catch (err) { showToast("No se pudo retirar: " + (err.code || err.message)); }
+      catch (err) { showToast("No se pudo retirar: " + errorText(err)); }
     });
     card.querySelector("[data-goto]")?.addEventListener("click", (e) => {
       const id = e.currentTarget.getAttribute("data-goto");
@@ -952,8 +992,36 @@ function renderProposalsView() {
 // ---------------------------------------------------------------------------
 // Escritura: aplicar cambios (admins), proponer (miembros), decidir
 // ---------------------------------------------------------------------------
+// Solo los campos que el admin ve en la tarjeta llegan a `people`: una propuesta no puede
+// colar photoURL, spouses, importBase u otras claves que no se muestran al revisarla.
+const SPOUSE_STATUSES = ["married", "partner", "divorced"];
+const STRING_FIELDS = ["name", "gender", "branch", "birthDate", "birthPlace", "deathDate", "deathPlace", "notes"];
+function sanitizeChange(after) {
+  const src = after && typeof after === "object" ? after : {};
+  const out = {};
+  EDITABLE.forEach((k) => {
+    if (!(k in src)) return;
+    const v = src[k];
+    if (STRING_FIELDS.includes(k)) { if (typeof v === "string") out[k] = v; }
+    else if (k === "generation") { if (Number.isFinite(v)) out[k] = v; }
+    else if (k === "isDeceased") { if (typeof v === "boolean") out[k] = v; }
+    else if (k === "fatherId" || k === "motherId") { if (v === null || typeof v === "string") out[k] = v; }
+  });
+  if ("photoURL" in src) out.photoURL = null;
+  const sp = src._spouse;
+  if (sp && typeof sp.id === "string") out._spouse = { id: sp.id, status: SPOUSE_STATUSES.includes(sp.status) ? sp.status : "married" };
+  const po = src._parentOf;
+  if (po && typeof po.targetId === "string") out._parentOf = { targetId: po.targetId, role: po.role === "mother" ? "mother" : "father" };
+  return out;
+}
+
+// Una "Nueva persona" no puede caer sobre alguien que ya está en el árbol (la pisaría).
+function addTargetsExisting(pr) {
+  return pr?.kind === "add" && Boolean(getPerson(pr.personId));
+}
+
 function applyChangeToBatch(batch, kind, personId, after) {
-  const data = { ...after };
+  const data = sanitizeChange(after);
   const spouseLink = data._spouse;
   const parentLink = data._parentOf;
   delete data._spouse;
@@ -990,6 +1058,10 @@ async function decideProposal(pr, status, decisionNote, button) {
     showToast("Esa persona ya no está en el árbol; no se puede aplicar.");
     return;
   }
+  if (status === "approved" && addTargetsExisting(pr)) {
+    showToast("Esta «Nueva persona» apunta a alguien que ya está en el árbol y lo borraría. Recházala.");
+    return;
+  }
   if (button) button.disabled = true;
   try {
     const batch = writeBatch(db);
@@ -1011,13 +1083,96 @@ async function decideProposal(pr, status, decisionNote, button) {
       text: status === "approved"
         ? `Se aprobó tu propuesta sobre ${pr.personName}. ¡Gracias por completar el árbol!${decisionNote ? " Nota: " + decisionNote : ""}`
         : `No se aprobó tu propuesta sobre ${pr.personName}.${decisionNote ? " Motivo: " + decisionNote : ""}`,
-      link: "/arbol/",
+      link: status === "approved" ? personaLink(pr.personId) : "/arbol/",
     });
   } catch (err) {
     console.error(err);
-    showToast("No se pudo guardar la decisión: " + (err.code || err.message));
+    if (await proposalAlreadyDecided(pr)) showToast("Otro administrador ya decidió esta propuesta.");
+    else showToast("No se pudo guardar la decisión: " + errorText(err));
     if (button) button.disabled = false;
   }
+}
+
+// ¿La decidió otro admin mientras tanto? (lote rechazado por las reglas: ya no está pendiente)
+async function proposalAlreadyDecided(pr) {
+  try {
+    const snap = await getDoc(doc(db, "proposals", pr.id));
+    return !snap.exists() || snap.data().status !== "pending";
+  } catch { return false; }
+}
+
+const personaLink = (id) => (id ? `/arbol/?persona=${encodeURIComponent(id)}` : "/arbol/");
+
+// "Corregir y aprobar": abre el formulario de persona con lo propuesto ya puesto, para que
+// el admin lo arregle antes de publicarlo. Al guardar se usa approveCorrected().
+function openCorrectProposalModal(pr, decisionNote) {
+  if (!pr || !state.isAdmin || pr.status !== "pending") return;
+  if (addTargetsExisting(pr)) { showToast("Esta «Nueva persona» apunta a alguien que ya está en el árbol y lo borraría. Recházala."); return; }
+  const after = sanitizeChange(pr.after);
+  if (pr.kind === "edit") {
+    if (!getPerson(pr.personId)) { showToast("Esa persona ya no está en el árbol; no se puede aplicar."); return; }
+    openEditPersonModal(pr.personId); // datos actuales…
+  } else {
+    resetPersonForm();
+  }
+  // …y encima, lo propuesto.
+  const set = (id, v) => { if (v !== undefined) $(id).value = v ?? ""; };
+  set("formName", after.name);
+  set("formGender", after.gender);
+  set("formBranch", after.branch);
+  if (after.generation !== undefined && after.generation !== null) $("formGeneration").value = String(after.generation);
+  if (after.isDeceased !== undefined) $("formIsDeceased").value = after.isDeceased ? "true" : "false";
+  set("formBirthDate", after.birthDate);
+  set("formBirthPlace", after.birthPlace);
+  set("formDeathDate", after.deathDate);
+  set("formDeathPlace", after.deathPlace);
+  set("formFatherId", after.fatherId);
+  set("formMotherId", after.motherId);
+  set("formNotes", after.notes);
+  if (after._spouse?.id) { $("formSpouseId").value = after._spouse.id; $("formSpouseStatus").value = after._spouse.status || "married"; }
+  if (pr.kind === "add" && after._parentOf?.targetId && getPerson(after._parentOf.targetId)) {
+    $("formLinkMode").value = "parent";
+    $("formTargetPersonId").value = after._parentOf.targetId;
+  }
+  state.correcting = pr;
+  $("personDialogTitle").textContent = `Corregir y aprobar: ${after.name || pr.personName || ""}`;
+  // Resumen de lo propuesto y su fuente: el formulario tapa la tarjeta de la propuesta.
+  const propuso = Object.keys(after).filter((k) => k in FIELD_LABELS)
+    .map((k) => `• ${FIELD_LABELS[k]}: ${formatFieldValue(k, after[k])}`);
+  setBanner([
+    `Propuesta de ${pr.name || pr.email}. Corrige lo que haga falta: al guardar se publica en el árbol y la propuesta queda aprobada con correcciones.`,
+    propuso.length ? `Propuso:\n${propuso.join("\n")}` : "",
+    pr.note ? `Su fuente o comentario: ${pr.note}` : "",
+  ].filter(Boolean).join("\n\n"));
+  $("btnSavePerson").textContent = "Corregir y aprobar";
+  $("sourceField").querySelector("label").textContent = "Nota para quien la propuso (opcional)";
+  $("formSource").placeholder = "Ej. Corregí el año según la partida de nacimiento";
+  $("formSource").value = decisionNote || "";
+  if (!$("personDialog").open) $("personDialog").showModal();
+  $("formName").focus();
+}
+
+// Publica la versión corregida de una propuesta en un solo lote: la persona, la propuesta
+// (aprobada, con corrected y los valores finales) y el historial con el antes y el después reales.
+async function approveCorrected(pr, kind, personId, before, after, decisionNote) {
+  const batch = writeBatch(db);
+  applyChangeToBatch(batch, kind, personId, after);
+  batch.update(doc(db, "proposals", pr.id), cleanForFirestore({
+    status: "approved", decidedBy: myEmail(), decidedAt: serverTimestamp(), decisionNote: decisionNote || "",
+    corrected: true, final: after, finalBefore: before,
+  }));
+  historyEntry(batch, {
+    kind: "proposal-approved", corrected: true, proposalId: pr.id, personId, personName: after.name || pr.personName || "",
+    proposedBy: pr.email, proposed: pr.after || {}, before, after, note: decisionNote || "",
+  });
+  await batch.commit();
+  const nombre = after.name || getPerson(personId)?.name || pr.personName || "";
+  showToast(`Aprobado con correcciones: ${nombre}`);
+  avisar(pr.uid, {
+    type: "propuesta",
+    text: `Tu propuesta sobre ${nombre} se aprobó con correcciones.${decisionNote ? " Nota: " + decisionNote : ""}`,
+    link: personaLink(personId),
+  });
 }
 
 async function adminDeletePerson(p) {
@@ -1040,7 +1195,7 @@ async function adminDeletePerson(p) {
     if (state.focusPersonId === p.id) state.focusPersonId = state.rootId;
     showToast(`Eliminado: ${p.name}`);
   } catch (err) {
-    showToast("No se pudo eliminar: " + (err.code || err.message));
+    showToast("No se pudo eliminar: " + errorText(err));
   }
 }
 
@@ -1054,6 +1209,19 @@ function selectPerson(personId) {
   document.querySelectorAll(".tree-node-card").forEach((c) => c.classList.toggle("is-selected", c.getAttribute("data-person-id") === p.id));
   $("inspectorDrawer").classList.remove("closed");
   renderInspector(p);
+  syncUrlPersona(p.id);
+}
+
+// Mantiene /arbol/?persona=<id> al día (sin recargar ni ensuciar el historial) y
+// conserva los demás parámetros, como ?emulador= en las pruebas.
+function syncUrlPersona(personId) {
+  try {
+    const u = new URL(location.href);
+    if (u.searchParams.get("persona") === personId) return;
+    if (personId) u.searchParams.set("persona", personId);
+    else u.searchParams.delete("persona");
+    history.replaceState(history.state, "", u.pathname + u.search + u.hash);
+  } catch { /* nada */ }
 }
 
 function setFocusPerson(personId) {
@@ -1065,6 +1233,7 @@ function setFocusPerson(personId) {
   renderTreeView();
   centerTreeOnPerson(p.id);
   renderInspector(p);
+  syncUrlPersona(p.id);
 }
 
 function relItem(person, role) {
@@ -1093,9 +1262,10 @@ function renderInspector(p) {
   const pending = state.pendingByPerson.get(p.id);
 
   body.innerHTML = `
-    <div style="display:flex;gap:0.45rem;flex-wrap:wrap;">
-      <button type="button" class="btn btn-primary btn-sm" id="inspBtnFocusTree" style="flex:1;">Ver en el árbol</button>
+    <div class="insp-actions">
+      <button type="button" class="btn btn-primary btn-sm" id="inspBtnFocusTree">Ver en el árbol</button>
       <button type="button" class="btn btn-sm" id="inspBtnEditPerson">${state.isAdmin ? "Editar" : "Proponer un cambio"}</button>
+      <a class="btn btn-sm" id="inspLinkPerfil" href="/perfil/?persona=${encodeURIComponent(p.id)}">Ver perfil</a>
     </div>
     ${pending ? `<div class="context-link-banner" style="margin:0;">Hay ${pending} cambio(s) pendiente(s) de aprobación para esta ficha.</div>` : ""}
     <div>
@@ -1177,6 +1347,7 @@ function populateFormSelects() {
 }
 
 function resetPersonForm() {
+  state.correcting = null;
   $("personForm").reset();
   $("formPersonId").value = "";
   $("formLinkMode").value = "";
@@ -1190,6 +1361,25 @@ function resetPersonForm() {
   $("sourceField").querySelector("label").textContent = state.isAdmin
     ? "Nota para el historial (opcional)"
     : "¿De dónde sale este dato? (para quien lo revise)";
+  const src = $("formSource");
+  src.dataset.ph ??= src.getAttribute("placeholder") || "";
+  src.placeholder = src.dataset.ph;
+  setFormError("");
+}
+
+// Error dentro del formulario (además del aviso): se queda visible hasta que se corrige.
+function setFormError(text) {
+  let el = $("personFormError");
+  if (!el) {
+    if (!text) return;
+    el = document.createElement("p");
+    el.id = "personFormError";
+    el.className = "form-error";
+    el.setAttribute("role", "alert");
+    $("personForm").querySelector(".dialog-footer").before(el);
+  }
+  el.textContent = text;
+  el.hidden = !text;
 }
 
 function setBanner(text) {
@@ -1314,6 +1504,7 @@ async function handlePersonFormSubmit(e) {
   const spouseId = $("formSpouseId").value || null;
   const spouseStatus = $("formSpouseStatus").value || "married";
   const note = $("formSource").value.trim();
+  const correcting = state.isAdmin ? state.correcting : null;
 
   let kind, personId, before = {}, after = {};
   if (existingId) {
@@ -1330,10 +1521,21 @@ async function handlePersonFormSubmit(e) {
       after._spouse = { id: spouseId, status: spouseStatus };
       before._spouse = currentSpouse ? { id: currentSpouse.id, status: currentSpouse.status } : null;
     }
-    if (Object.keys(after).length === 0) { showToast("No cambiaste ningún dato."); return; }
+    if (Object.keys(after).length === 0) {
+      const msg = correcting
+        ? "Así corregida no cambia nada del árbol. Si no procede, cierra y usa «Rechazar»."
+        : "No cambiaste ningún dato.";
+      setFormError(msg);
+      showToast(msg);
+      return;
+    }
   } else {
     kind = "add";
-    personId = newPersonId();
+    if (correcting && addTargetsExisting(correcting)) {
+      setFormError("Esta «Nueva persona» apunta a alguien que ya está en el árbol y lo borraría. Cierra y usa «Rechazar».");
+      return;
+    }
+    personId = correcting?.kind === "add" && correcting.personId ? correcting.personId : newPersonId();
     after = { ...values, photoURL: null };
     if (spouseId) after._spouse = { id: spouseId, status: spouseStatus };
     if (linkMode === "parent" && targetId) after._parentOf = { targetId, role: values.gender === "Female" ? "mother" : "father" };
@@ -1341,8 +1543,12 @@ async function handlePersonFormSubmit(e) {
 
   const btn = $("btnSavePerson");
   btn.disabled = true;
+  setFormError("");
   try {
-    if (state.isAdmin) {
+    if (correcting) {
+      await approveCorrected(correcting, kind, personId, before, after, note);
+      state.selectedPersonId = personId;
+    } else if (state.isAdmin) {
       const batch = writeBatch(db);
       applyChangeToBatch(batch, kind, personId, after);
       historyEntry(batch, { kind: kind === "add" ? "add" : "edit", personId, personName: values.name, before, after, note });
@@ -1368,7 +1574,14 @@ async function handlePersonFormSubmit(e) {
     $("personDialog").close();
   } catch (err) {
     console.error(err);
-    showToast("No se pudo enviar: " + (err.code || err.message));
+    if (correcting && await proposalAlreadyDecided(correcting)) {
+      $("personDialog").close();
+      showToast("Otro administrador ya decidió esta propuesta. No se guardó tu corrección.");
+    } else {
+      const msg = (state.isAdmin ? "No se pudo guardar: " : "No se pudo enviar: ") + errorText(err);
+      setFormError(msg);
+      showToast(msg);
+    }
   } finally {
     btn.disabled = false;
   }
@@ -1521,15 +1734,28 @@ async function importTree(file) {
     const ops = [];
     // Nunca se borra a nadie. A quien ya está en el árbol solo se le actualiza la rama, la
     // generación y los vínculos que falten; sus datos (nombre, fechas, notas…) se conservan.
+    // `importBase` recuerda lo que puso la importación anterior: si un admin cambió después la
+    // rama, la generación o los padres (a mano o al aprobar una propuesta), se respeta su cambio.
+    const ESTRUCTURA = ["branch", "generation", "fatherId", "motherId"];
     people.forEach((p) => {
       const { id, ...data } = p;
       const viejo = existentes.get(id);
-      const datos = !viejo ? data : {
-        branch: data.branch,
-        generation: data.generation,
-        fatherId: viejo.fatherId || data.fatherId,
-        motherId: viejo.motherId || data.motherId,
-        spouses: [...(viejo.spouses || []), ...data.spouses.filter((s) => !(viejo.spouses || []).some((v) => v.id === s.id))],
+      const importBase = Object.fromEntries(ESTRUCTURA.map((k) => [k, data[k] ?? null]));
+      const base = viejo?.importBase;
+      const elegir = (k, sinBase) => {
+        if (!base || !(k in base)) return sinBase;
+        return JSON.stringify(viejo[k] ?? null) === JSON.stringify(base[k] ?? null) ? data[k] : viejo[k];
+      };
+      const datos = !viejo ? { ...data, importBase } : {
+        branch: elegir("branch", data.branch),
+        generation: elegir("generation", data.generation),
+        fatherId: elegir("fatherId", viejo.fatherId || data.fatherId),
+        motherId: elegir("motherId", viejo.motherId || data.motherId),
+        // Parejas: las del árbol (con su tipo de unión) más las del archivo que falten, sin repetir.
+        spouses: [...(viejo.spouses || []), ...data.spouses]
+          .filter((s, i, all) => s?.id && all.findIndex((o) => o?.id === s.id) === i)
+          .map(({ id: sid, status, details }) => ({ id: sid, status: status || "married", details: details || "" })),
+        importBase,
       };
       ops.push((b) => b.set(doc(db, "people", id), { ...datos, updatedAt: serverTimestamp(), updatedBy: myEmail() }, { merge: true }));
     });
@@ -1610,6 +1836,13 @@ function initUi() {
   $("btnClosePersonDialog").addEventListener("click", () => $("personDialog").close());
   $("btnCancelPersonDialog").addEventListener("click", () => $("personDialog").close());
   $("personForm").addEventListener("submit", handlePersonFormSubmit);
+  $("personForm").addEventListener("input", () => setFormError(""));
+  $("personDialog").addEventListener("close", () => { state.correcting = null; });
+  // Al cerrar un diálogo, los avisos vuelven a la página (si no, se irían con él).
+  document.querySelectorAll("dialog").forEach((d) => d.addEventListener("close", () => {
+    const c = $("toastContainer");
+    if (c && c.parentElement === d) document.body.appendChild(c);
+  }));
 
   $("btnOpenAdmin").addEventListener("click", () => $("adminDialog").showModal());
   $("btnImportFromGate").addEventListener("click", () => $("adminDialog").showModal());

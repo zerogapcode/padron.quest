@@ -1,0 +1,64 @@
+/* Perfil de cada familiar — usa las variables "Atlántico" de /comun/base.css. */
+.perfil-hero { display: flex; flex-wrap: wrap; align-items: center; gap: 20px 30px; box-shadow: inset 0 6px 0 var(--rama, var(--oceano)); padding-top: 30px; }
+.perfil-foto { width: 128px; height: 128px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 50%; overflow: hidden;
+  background: var(--rama, var(--oceano)); color: #fff; font-family: var(--serif); font-size: 44px; font-weight: 600; box-shadow: 0 0 0 6px var(--arena); }
+.perfil-foto img { width: 100%; height: 100%; object-fit: cover; }
+.perfil-datos { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.perfil-datos h1 { font-size: clamp(1.9rem, 6vw, 2.6rem); line-height: 1.1; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.perfil-rama { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ocre-texto); }
+.punto-rama { width: 11px; height: 11px; border-radius: 50%; background: var(--rama, var(--oceano)); }
+.perfil-chip { padding: 3px 12px; border-radius: 999px; background: var(--cielo-claro); color: var(--oceano); font-size: 14px; font-weight: 700; }
+.perfil-chip.memoria { background: var(--arena); color: var(--tinta-suave); }
+.perfil-vida { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 3px; color: var(--tinta-suave); }
+.perfil-vida b { color: var(--tinta); font-weight: 600; }
+.perfil-acciones { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 6px; }
+.perfil-aviso { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.perfil-aviso h1 { font-size: clamp(1.7rem, 5vw, 2.2rem); }
+
+.perfil-columnas { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+.perfil-col { flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 22px; }
+.perfil-col.ancha { flex: 999 1 440px; }
+.perfil-columnas .card { display: flex; flex-direction: column; gap: 12px; }
+.perfil-columnas .card h2 { font-size: 23px; }
+.bio { font-size: 17px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.notas { padding-top: 12px; border-top: 1px solid var(--linea-2); }
+.notas h3, .familia-grupo h3 { font-family: var(--sans); font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ocre-texto); margin-bottom: 6px; }
+.notas p { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--tinta-suave); }
+.perfil-columnas .card > .ghost { align-self: flex-start; }
+
+.familia-grupo + .familia-grupo { margin-top: 6px; }
+.familia-lista { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.familiar { display: flex; align-items: center; gap: 12px; min-height: 54px; padding: 6px 10px; margin: 0 -10px; border-radius: 14px; color: var(--tinta); text-decoration: none; }
+.familiar:hover { background: var(--arena-2); }
+.familiar .ini { width: 40px; height: 40px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 50%;
+  border: 2px solid var(--rama, var(--oceano)); background: color-mix(in srgb, var(--rama, #13293D) 16%, #fff); color: var(--oceano); font-size: 14px; font-weight: 700; }
+.familiar-txt { min-width: 0; }
+.familiar-txt b { display: block; font-weight: 600; color: var(--oceano); overflow-wrap: anywhere; }
+.familiar-txt .det { display: block; font-size: 14.5px; color: var(--tinta-suave); }
+
+.form-sobre { display: flex; flex-direction: column; gap: 12px; }
+.form-sobre textarea { min-height: 130px; resize: vertical; }
+.contador { margin-top: -6px; font-size: 14px; color: var(--tinta-suave); text-align: right; }
+
+.perfil-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.perfil-fotos a { display: block; aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: var(--linea-2); }
+.perfil-fotos img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ver-todas { align-self: flex-start; }
+
+.mini-post { display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--linea-2); }
+.mini-post:first-of-type { padding-top: 0; border-top: 0; }
+.mini-post p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.mini-post img { max-width: 100%; max-height: 300px; border-radius: 14px; object-fit: cover; align-self: flex-start; }
+.mini-post .pie { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 14.5px; color: var(--tinta-suave); }
+.ver-muro { align-self: flex-start; display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; }
+
+.perfil-hero a:focus-visible, .perfil-hero button:focus-visible, .perfil-columnas a:focus-visible, .perfil-columnas button:focus-visible,
+.perfil-columnas textarea:focus-visible, .perfil-columnas input:focus-visible { outline: 3px solid var(--ocre); outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .perfil-hero { flex-direction: column; text-align: center; }
+  .perfil-datos { align-items: center; }
+  .perfil-acciones { justify-content: center; width: 100%; }
+  .perfil-acciones > * { flex: 1 1 160px; }
+  .perfil-foto { width: 112px; height: 112px; font-size: 38px; }
+}

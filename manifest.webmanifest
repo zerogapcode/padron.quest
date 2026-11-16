@@ -1,0 +1,17 @@
+{
+  "name": "Familia Padrón Perera",
+  "short_name": "Padrón",
+  "description": "La red privada de la familia Padrón Perera.",
+  "lang": "es",
+  "id": "/muro/",
+  "start_url": "/muro/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F5F0E8",
+  "theme_color": "#13293D",
+  "icons": [
+    { "src": "/comun/icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/comun/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/comun/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

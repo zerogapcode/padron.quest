@@ -89,7 +89,7 @@ function tarjeta(e) {
       h("h3", { text: e.title }),
       h("div", { class: "evento-meta", text: [dia.charAt(0).toUpperCase() + dia.slice(1), e.time, e.place].filter(Boolean).join(" · ") }),
       e.description ? h("p", { class: "evento-desc", text: e.description }) : null,
-      h("div", { class: "evento-meta", text: `Organiza: ${e.name}` }),
+      h("div", { class: "evento-meta" }, "Organiza: ", h("a", { href: `/perfil/?uid=${encodeURIComponent(e.uid || "")}`, text: e.name })),
       h("div", { class: "rsvp", role: "group", "aria-label": "¿Vas a ir?" },
         [["si", "Asistiré"], ["quizas", "Tal vez"], ["no", "No podré"]].map(([v, t]) =>
           h("button", { type: "button", "aria-pressed": String(mia === v), text: t, onclick: () => responder(v) }))),
@@ -175,7 +175,7 @@ function pintarCumples() {
   });
   caja.replaceChildren(...[...porMes.values()].flatMap(({ mes, items }) => [
     h("h3", { text: MESES_LARGOS[mes] }),
-    h("ul", {}, items.map((x) => h("li", {}, h("span", { text: x.p.name }), h("span", { text: `${x.f.d}${x.edad ? ` · ${x.edad}` : ""}` })))),
+    h("ul", {}, items.map((x) => h("li", {}, h("a", { href: `/perfil/?persona=${encodeURIComponent(x.p.id)}`, text: x.p.name }), h("span", { text: `${x.f.d}${x.edad ? ` · ${x.edad}` : ""}` })))),
   ]));
   void avatar;
 }

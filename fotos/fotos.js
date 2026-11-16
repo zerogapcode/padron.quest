@@ -14,6 +14,8 @@ const dlg = h("dialog", { class: "dialogo", "aria-labelledby": "dlgTitulo" });
 const visor = h("dialog", { class: "foto-grande", "aria-label": "Foto ampliada" });
 document.body.append(dlg, visor);
 visor.addEventListener("click", (e) => { if (e.target === visor) visor.close(); });
+// Estado de la subida: vive fuera del repintado (cada foto nueva repinta el álbum).
+const estadoSubida = h("span", { class: "muted small", role: "status" });
 
 iniciarPagina({
   activa: "fotos",
@@ -38,6 +40,7 @@ iniciarPagina({
 
 function ir(cambios) {
   Object.assign(st, cambios);
+  estadoSubida.textContent = "";
   const p = new URLSearchParams(location.search);
   ["album", "persona"].forEach((k) => { if (st[k]) p.set(k, st[k]); else p.delete(k); });
   history.pushState(null, "", "?" + p.toString());
@@ -75,7 +78,7 @@ function pintar() {
     etiquetados.length ? h("section", { class: "card", "aria-labelledby": "tPersonas" },
       h("h2", { id: "tPersonas", text: "Buscar fotos de alguien" }),
       h("div", { class: "etiquetas" }, etiquetados.map((id) => h("a", { class: "etiqueta", href: `?persona=${encodeURIComponent(id)}`,
-        onclick: (e) => { e.preventDefault(); ir({ persona: id, album: null }); } }, `${nombrePersona(id)} (${st.fotos.filter((f) => (f.tags || []).includes(id)).length})`)))) : null);
+        onclick: (e) => { e.preventDefault(); ir({ persona: id, album: null }); } }, `${nombrePersona(id)} (${st.fotos.filter((f) => (f.tags || []).includes(id)).length})`)))) : ""); // "" y no null: replaceChildren escribiría «null»
 }
 
 function grillaFotos(fotos) {
@@ -95,7 +98,7 @@ function pintarAlbum() {
   const fotos = fotosDe(a.id);
   const puedeEditar = a.uid === st.yo.uid || st.isAdmin;
   const input = h("input", { type: "file", accept: "image/*", multiple: true, class: "sr-only", id: "subir" });
-  const estado = h("span", { class: "muted small", role: "status" });
+  const estado = estadoSubida; // el mismo elemento en cada repintado: así el «Listo…» no se pierde
   input.addEventListener("change", () => subirVarias([...input.files], a, estado).finally(() => { input.value = ""; }));
   raiz.replaceChildren(
     h("button", { type: "button", class: "ghost", style: "align-self:flex-start", text: "← Todos los álbumes", onclick: () => ir({ album: null }) }),
@@ -113,7 +116,8 @@ function pintarPersona() {
   const fotos = st.fotos.filter((f) => (f.tags || []).includes(st.persona));
   raiz.replaceChildren(
     h("button", { type: "button", class: "ghost", style: "align-self:flex-start", text: "← Todos los álbumes", onclick: () => ir({ persona: null }) }),
-    h("div", { class: "pagina-cab" }, h("div", {}, h("h1", { text: `Fotos de ${nombrePersona(st.persona)}` }), h("p", { text: `${fotos.length} fotos en las que aparece` }))),
+    h("div", { class: "pagina-cab" }, h("div", {}, h("h1", { text: `Fotos de ${nombrePersona(st.persona)}` }), h("p", { text: `${fotos.length} fotos en las que aparece` })),
+      st.personas.has(st.persona) ? h("a", { class: "ghost", href: `/perfil/?persona=${encodeURIComponent(st.persona)}`, text: "Ver su perfil" }) : null),
     fotos.length ? grillaFotos(fotos) : h("div", { class: "card vacio", text: "Todavía no hay fotos etiquetadas de esta persona." }));
 }
 
@@ -151,8 +155,8 @@ function verFoto(f) {
     h("img", { src: safeUrl(f.url) || "", alt: f.caption || "Foto de la familia" }),
     h("div", { class: "pie-grande" },
       f.caption ? h("div", { text: f.caption }) : null,
-      (f.tags || []).length ? h("div", { class: "etiquetas" }, (f.tags || []).map((id) => h("a", { class: "etiqueta", href: `?persona=${encodeURIComponent(id)}`,
-        onclick: (e) => { e.preventDefault(); visor.close(); ir({ persona: id, album: null }); } }, nombrePersona(id)))) : null,
+      (f.tags || []).length ? h("div", { class: "etiquetas", "aria-label": "Personas en la foto" }, (f.tags || []).map((id) => h("a", { class: "etiqueta",
+        href: `/perfil/?persona=${encodeURIComponent(id)}`, title: `Ver el perfil de ${nombrePersona(id)}` }, nombrePersona(id)))) : null,
       h("div", { class: "tiempo", style: "color:#C9D3DC" }, `Subida por ${f.name} · `, timeEl(f.createdAt)),
       selector,
       puedeEditar ? h("form", { style: "display:flex;gap:8px", onsubmit: async (e) => {

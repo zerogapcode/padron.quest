@@ -1241,3 +1241,44 @@ dialog.modern-dialog::backdrop {
   .diff-table th, .diff-table td { padding: 6px; }
 }
 .header-actions a.btn { text-decoration: none; }
+
+/* Ficha: acciones principales (toques cómodos en el teléfono) */
+.insp-actions { display: flex; gap: 0.45rem; flex-wrap: wrap; }
+.insp-actions .btn { flex: 1 1 auto; min-height: 44px; font-size: 15px; text-decoration: none; }
+.insp-actions #inspBtnFocusTree { flex-basis: 100%; }
+/* Formulario de persona: centrado (base.css pone margin:0 a todo) y sin desbordar a lo ancho
+   cuando un nombre largo ensancha un desplegable. */
+dialog.modern-dialog { margin: auto; }
+.form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.form-field input, .form-field select, .form-field textarea { width: 100%; min-width: 0; font-size: 15px; min-height: 44px; }
+.form-field label { font-size: 0.85rem; }
+.dialog-body { overflow-x: hidden; }
+/* Cabecera y botones siempre visibles; solo se desplaza el cuerpo (aunque el título ocupe dos líneas). */
+dialog.modern-dialog > form { display: flex; flex-direction: column; max-height: calc(90vh - 2px); max-height: calc(90dvh - 2px); }
+dialog.modern-dialog > form > .dialog-body { flex: 1 1 auto; min-height: 0; max-height: none; }
+dialog.modern-dialog { max-height: 90dvh; }
+.dialog-footer .btn { min-height: 44px; font-size: 15px; }
+@media (max-width: 900px) { .form-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) { .form-field input, .form-field select, .form-field textarea { font-size: 16px; } }
+/* Propuestas: botones de decisión y "Aprobada con correcciones" */
+.proposal-actions .btn { min-height: 44px; font-size: 15px; }
+.proposal-status.approved { text-align: right; }
+/* Los valores largos pueden partirse donde sea; las etiquetas («Generación», «Lugar de nacimiento»)
+   solo entre palabras, para que no parezcan erratas en el teléfono. */
+.diff-table td { overflow-wrap: anywhere; }
+.diff-table td:first-child { overflow-wrap: normal; word-break: normal; hyphens: manual; }
+@media (max-width: 760px) {
+  .diff-table { font-size: 0.85rem; }
+  .diff-table th { letter-spacing: .02em; }
+  .diff-table th, .diff-table td { padding: 6px 4px; }
+}
+/* Cerrar (×) de los diálogos: toque de 44px */
+.dialog-header .btn-icon { width: 44px; height: 44px; min-width: 44px; min-height: 44px; flex: none; font-size: 1.3rem; }
+/* Resumen de la propuesta al corregirla (varias líneas) y error dentro del formulario */
+#relationContextBanner { white-space: pre-line; }
+.form-error { margin: 0; padding: 10px 1.35rem; background: #FBEAE5; color: #8A2E1C; font-size: 15px; font-weight: 600; border-top: 1px solid #E8C3B8; }
+.form-error[hidden] { display: none; }
+.diff-table td.final { font-weight: 600; }
+.diff-table td.final.fixed { color: var(--text-primary); background: var(--ocre-claro, #F3E3C6); }
+.fixed-tag { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: var(--ocre, #D9A55B); color: #13293D; font-size: 0.7rem; font-weight: 700; }
+.corrected-note { border-left: 3px solid var(--ocre, #D9A55B); }

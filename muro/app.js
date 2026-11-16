@@ -12,7 +12,7 @@ import {
 import {
   ref, uploadBytes, getDownloadURL, deleteObject,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-storage.js";
-import { auth, db, storage, EMULADOR, avisar, montarCampana, montarContadorMensajes } from "/comun/base.js";
+import { auth, db, storage, EMULADOR, avisar, montarCampana, montarContadorMensajes, fotoPerfil, nombrePerfil } from "/comun/base.js";
 
 if (EMULADOR) window.__db = { db, doc, updateDoc, arrayUnion, setDoc, getDoc };
 
@@ -42,6 +42,9 @@ const unsubs = [];
 const myEmail = () => (state.user?.email || "").toLowerCase();
 const safeUrl = (u) => (typeof u === "string" && (/^https:\/\//.test(u) || (EMULADOR && /^http:\/\/127\.0\.0\.1:/.test(u))) ? u : null);
 const GRUPO = new URLSearchParams(location.search).get("grupo") || null;
+// Enlaces a la página de perfil de cada familiar.
+const perfilUid = (uid) => `/perfil/?uid=${encodeURIComponent(uid || "")}`;
+const perfilPersona = (id) => `/perfil/?persona=${encodeURIComponent(id || "")}`;
 
 // Construye elementos sin innerHTML (todo el texto de usuarios entra como texto).
 function h(tag, props = {}, ...children) {
@@ -169,6 +172,8 @@ onAuthStateChanged(auth, (user) => {
   const photo = safeUrl(user.photoURL);
   $("user-photo").hidden = !photo;
   if (photo) $("user-photo").src = photo;
+  $("user-ini").hidden = Boolean(photo);
+  $("user-ini").textContent = initials(user.displayName || user.email);
   enter(user);
 });
 
@@ -191,10 +196,11 @@ async function enter(user) {
     return;
   }
 
-  // Perfil público dentro de la familia (nombre y foto), para mostrar quién da "me gusta".
+  // Perfil dentro de la familia (nombre, foto y ficha del árbol). Con merge para no borrar su "Sobre mí".
   setDoc(doc(db, "profiles", user.uid), {
-    name: (user.displayName || email).slice(0, 120), photoURL: safeUrl(user.photoURL), email, updatedAt: serverTimestamp(),
-  }).catch((e) => console.warn("perfil:", e));
+    name: nombrePerfil(user, email), photoURL: fotoPerfil(user.photoURL), email,
+    personId: state.member?.personId || null, updatedAt: serverTimestamp(),
+  }, { merge: true }).catch((e) => console.warn("perfil:", e.code || e.message));
 
   $("nav").hidden = false;
   $("admin").hidden = !state.isAdmin;
@@ -370,9 +376,9 @@ function renderPost(p) {
 
   const art = h("article", { class: "card post", "data-post-id": p.id },
     h("header", { class: "post-head" },
-      avatar(p.name || p.email, p.photoURL),
+      h("a", { href: perfilUid(p.uid), class: "post-avatar-link", tabindex: "-1", "aria-hidden": "true" }, avatar(p.name || p.email, p.photoURL)),
       h("div", { class: "post-autor" },
-        h("div", { class: "post-name", text: p.name || p.email }),
+        h("a", { class: "post-name", href: perfilUid(p.uid), text: p.name || p.email }),
         timeEl(p.createdAt))));
 
   if (p.text) art.append(h("p", { class: "post-text", text: p.text }));
@@ -420,7 +426,7 @@ function renderPost(p) {
     }
     visibles.forEach((c) => {
       const cuerpo = h("div", { class: "comentario-cuerpo" },
-        h("b", { text: c.name || c.email }), timeEl(c.createdAt),
+        h("a", { class: "comentario-autor", href: perfilUid(c.uid), text: c.name || c.email }), timeEl(c.createdAt),
         h("div", { class: "comentario-texto", text: c.text }));
       const fila = h("div", { class: "comentario" }, avatar(c.name || c.email, c.photoURL, "avatar-ini sm"), cuerpo);
       if (c.uid === me.uid || state.isAdmin) {
@@ -602,9 +608,9 @@ function renderSide() {
     const cuando = c.dias === 0 ? "¡Hoy!" : c.dias === 1 ? "Mañana" : fechaCorta(c.f);
     dest.append(h("div", { class: "cumple-hoy" },
       avatar(c.p.name, c.p.photoURL),
-      h("div", {}, h("b", { text: c.p.name }), h("span", { text: c.edad ? `${cuando} · cumple ${c.edad}` : cuando }))));
+      h("div", {}, h("a", { class: "enlace-perfil", href: perfilPersona(c.p.id) }, h("b", { text: c.p.name })), h("span", { text: c.edad ? `${cuando} · cumple ${c.edad}` : cuando }))));
     cumples.slice(1, 5).forEach((x) => {
-      lista.append(h("li", {}, h("span", { text: x.p.name }), h("span", { text: x.dias === 1 ? "mañana" : `${x.f.d} ${MESES_LARGOS[x.f.m].slice(0, 3)}` })));
+      lista.append(h("li", {}, h("a", { class: "enlace-perfil", href: perfilPersona(x.p.id), text: x.p.name }), h("span", { text: x.dias === 1 ? "mañana" : `${x.f.d} ${MESES_LARGOS[x.f.m].slice(0, 3)}` })));
     });
   }
 
@@ -634,7 +640,7 @@ function renderSide() {
       }
       rama.append(h("li", {},
         h("span", { class: "eje" }, h("span", { class: "punto" }), h("span", { class: "tramo" })),
-        h("span", { class: "dato" }, h("b", { text: nivel === 0 ? `${p.name}` : p.name }), h("span", { text: [rol, p.birthPlace].filter(Boolean).join(" · ") }))));
+        h("span", { class: "dato" }, h("a", { class: "enlace-perfil", href: perfilPersona(p.id) }, h("b", { text: p.name })), h("span", { text: [rol, p.birthPlace].filter(Boolean).join(" · ") }))));
     });
   }
 
@@ -693,7 +699,12 @@ function renderMembers() {
       h("div", { class: "fila" }, h("span", { text: m.email }),
         h("button", { type: "button", class: "ghost small", text: "Quitar", onclick: async () => {
           if (!confirm(`¿Quitar el acceso de ${m.email}?`)) return;
-          try { await deleteDoc(doc(db, "members", m.email)); } catch (err) { alert("No se pudo quitar: " + (err.code || err.message)); }
+          try { await deleteDoc(doc(db, "members", m.email)); } catch (err) { alert("No se pudo quitar: " + (err.code || err.message)); return; }
+          // Su perfil deja de aparecer en la red (y vinculado a su ficha del árbol).
+          try {
+            const ps = await getDocs(query(collection(db, "profiles"), where("email", "==", m.email)));
+            await Promise.all(ps.docs.map((d) => deleteDoc(d.ref)));
+          } catch (err) { console.warn("perfil del invitado:", err.code || err.message); }
         } })),
       s);
   }));

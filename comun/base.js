@@ -7,7 +7,7 @@ import {
   connectAuthEmulator, signInWithCredential,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 import {
-  getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, query, where, limit,
+  getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, query, where, limit, orderBy,
   onSnapshot, serverTimestamp, writeBatch, connectFirestoreEmulator,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
 import {
@@ -30,11 +30,13 @@ export const db = getFirestore(app);
 export const storage = getStorage(app);
 
 // Pruebas locales con emuladores (?emulador=1 en localhost). Sin efecto en el sitio publicado.
+// ?emulador=2, =3… usan puertos desplazados de 10 en 10, para correr varias pruebas a la vez.
 export const EMULADOR = new URLSearchParams(location.search).has("emulador") && ["localhost", "127.0.0.1"].includes(location.hostname);
+export const EMU_DESPLAZA = EMULADOR ? (Math.max(1, Number(new URLSearchParams(location.search).get("emulador")) || 1) - 1) * 10 : 0;
 if (EMULADOR && !yaIniciada) {
-  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-  connectFirestoreEmulator(db, "127.0.0.1", 8080);
-  connectStorageEmulator(storage, "127.0.0.1", 9199);
+  connectAuthEmulator(auth, `http://127.0.0.1:${9099 + EMU_DESPLAZA}`, { disableWarnings: true });
+  connectFirestoreEmulator(db, "127.0.0.1", 8080 + EMU_DESPLAZA);
+  connectStorageEmulator(storage, "127.0.0.1", 9199 + EMU_DESPLAZA);
   window.__entrarPrueba = (email, nombre) => signInWithCredential(auth, GoogleAuthProvider.credential(
     JSON.stringify({ sub: email, email, email_verified: true, name: nombre || email })));
 }
@@ -57,6 +59,11 @@ export function h(tag, props = {}, ...children) {
   children.flat().forEach((c) => { if (c !== null && c !== undefined && c !== false) el.append(c); });
   return el;
 }
+
+// Foto de Google para guardar en profiles/{uid} (las reglas solo aceptan https).
+// Las reglas solo aceptan fotos de Google (googleusercontent.com) y el nombre de la cuenta (o el correo).
+export const fotoPerfil = (u) => (typeof u === "string" && /^https:\/\/[a-z0-9-]+\.googleusercontent\.com\//.test(u) ? u : null);
+export const nombrePerfil = (u, email) => (u.displayName && u.displayName.length <= 120 ? u.displayName : email);
 
 export function initials(name) {
   const parts = String(name || "?").replace(/["'()]/g, "").trim().split(/\s+/).filter(Boolean);
@@ -152,6 +159,148 @@ export async function avisar(paraUid, { type, text, link }) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Avisos en el dispositivo: notificaciones push (Firebase Cloud Messaging) aunque la página esté cerrada.
+// Cada dispositivo guarda su token en profiles/{uid}/pushTokens/{token}; las Cloud Functions envían.
+// ---------------------------------------------------------------------------
+// Clave pública VAPID (consola de Firebase → Configuración → Cloud Messaging → Certificados push web).
+// Vacía: el SDK 13.3.0 usa la clave por defecto de Firebase (getToken → updateVapidKey).
+const VAPID_KEY = "";
+const SDK_MENSAJERIA = "https://www.gstatic.com/firebasejs/13.3.0/firebase-messaging.js";
+const CLAVE_LOCAL = "padron.avisosDispositivo"; // { uid, token, revisado } de este navegador
+const UN_DIA = 86400000;
+const leerLocal = () => { try { return JSON.parse(localStorage.getItem(CLAVE_LOCAL) || "null"); } catch { return null; } };
+const guardarLocal = (v) => { try { if (v) localStorage.setItem(CLAVE_LOCAL, JSON.stringify(v)); else localStorage.removeItem(CLAVE_LOCAL); } catch { /* nada */ } };
+const esIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const enPantallaDeInicio = () => window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone === true;
+const pushPosible = () => window.isSecureContext && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const opcionesVapid = () => (VAPID_KEY ? { vapidKey: VAPID_KEY } : {});
+// "granted" | "denied" | "default". Se consulta la API de permisos (más fiable) y, si no existe, Notification.permission.
+async function permisoNotificaciones() {
+  try {
+    const s = await navigator.permissions?.query({ name: "notifications" });
+    if (s?.state) return s.state === "prompt" ? "default" : s.state;
+  } catch { /* navegador sin esa consulta */ }
+  return Notification.permission;
+}
+
+let mensajeriaPromesa = null;
+function mensajeria() {
+  mensajeriaPromesa ??= (async () => {
+    const m = await import(SDK_MENSAJERIA);
+    if (!(await m.isSupported())) return null;
+    return { m, messaging: m.getMessaging(app) };
+  })().catch((e) => { mensajeriaPromesa = null; throw e; });
+  return mensajeriaPromesa;
+}
+const registrarSW = () => navigator.serviceWorker.register("/firebase-messaging-sw.js");
+
+// Token de FCM de este navegador. En el emulador no hay FCM: se usa un token simulado.
+async function tokenDelDispositivo() {
+  const reg = await registrarSW();
+  if (EMULADOR) return leerLocal()?.token || "emu-" + crypto.randomUUID().replace(/-/g, "");
+  const mm = await mensajeria();
+  if (!mm) throw new Error("sin-soporte");
+  return mm.m.getToken(mm.messaging, { serviceWorkerRegistration: reg, ...opcionesVapid() });
+}
+async function guardarToken(uid, token) {
+  await setDoc(doc(db, "profiles", uid, "pushTokens", token), { token, ua: navigator.userAgent.slice(0, 200), createdAt: serverTimestamp() });
+  guardarLocal({ uid, token, revisado: Date.now() });
+}
+// Apaga los avisos de este navegador: borra el documento (si hay sesión de esa cuenta) e invalida el token en FCM.
+async function apagarDispositivo(uidConSesion) {
+  const local = leerLocal();
+  guardarLocal(null);
+  if (!local?.token) return;
+  if (uidConSesion && local.uid === uidConSesion) {
+    try { await deleteDoc(doc(db, "profiles", uidConSesion, "pushTokens", local.token)); } catch { /* nada */ }
+  }
+  if (EMULADOR || (await permisoNotificaciones()) !== "granted") return;
+  try {
+    const mm = await mensajeria();
+    if (!mm) return;
+    await mm.m.getToken(mm.messaging, { serviceWorkerRegistration: await registrarSW(), ...opcionesVapid() });
+    await mm.m.deleteToken(mm.messaging);
+  } catch (e) { console.warn("avisos del dispositivo:", e.code || e.message); }
+}
+
+const TXT_BLOQUEADO = "Las notificaciones están bloqueadas para este sitio. Permítelas en la configuración del navegador (el candado junto a la dirección) y vuelve a intentarlo.";
+
+// Interruptor "Recibir avisos en este dispositivo" para el panel de la campana.
+function controlDispositivo(yo) {
+  const detalle = h("small");
+  const boton = h("button", { type: "button", class: "disp-interruptor", role: "switch", "aria-checked": "false" },
+    h("span", { class: "disp-textos" }, h("b", { text: "Recibir avisos en este dispositivo" }), detalle),
+    h("span", { class: "disp-pista", "aria-hidden": "true" }));
+  const nota = h("p", { class: "disp-nota", role: "status", hidden: true });
+  const el = h("div", { class: "campana-disp" }, boton, nota);
+
+  if (!pushPosible()) {
+    boton.hidden = true;
+    nota.hidden = false;
+    nota.textContent = esIOS() && !enPantallaDeInicio()
+      ? "Para recibir avisos en el iPhone: toca Compartir → «Añadir a pantalla de inicio» y abre Padrón desde ese ícono (iOS 16.4 o más reciente)."
+      : "Este navegador no puede recibir avisos en el dispositivo. Prueba con Chrome, Edge, Firefox o Safari actualizados.";
+    return { el, limpiar: () => {} };
+  }
+
+  let activo = false;
+  let ocupado = false;
+  const poner = (on, texto = "") => {
+    activo = on;
+    boton.setAttribute("aria-checked", String(on));
+    detalle.textContent = on ? "Activado: te llegan aunque tengas la página cerrada." : "Te llegan al teléfono o a la computadora aunque tengas la página cerrada.";
+    nota.textContent = texto;
+    nota.hidden = !texto;
+  };
+
+  poner(false);
+  const local = leerLocal();
+  if (local && local.uid !== yo.uid) apagarDispositivo(null); // los dejó encendidos otra cuenta: se apagan
+  (async () => {
+    const permiso = await permisoNotificaciones();
+    if (ocupado) return; // ya lo está cambiando a mano
+    poner(!!(local && local.uid === yo.uid && permiso === "granted"), permiso === "denied" ? TXT_BLOQUEADO : "");
+    if (!activo) return;
+    // El servidor borra los tokens caducados; y una vez al día se renueva el token por si FCM lo cambió.
+    const s = await getDoc(doc(db, "profiles", yo.uid, "pushTokens", local.token));
+    if (!s.exists()) { guardarLocal(null); if (!ocupado) poner(false); return; }
+    if (EMULADOR || Date.now() - (local.revisado || 0) < UN_DIA) return;
+    const nuevo = await tokenDelDispositivo();
+    if (nuevo !== local.token) {
+      await guardarToken(yo.uid, nuevo);
+      await deleteDoc(doc(db, "profiles", yo.uid, "pushTokens", local.token)).catch(() => {});
+    } else guardarLocal({ ...local, revisado: Date.now() });
+  })().catch((e) => console.warn("avisos del dispositivo:", e.code || e.message));
+
+  boton.addEventListener("click", async () => {
+    if (ocupado) return;
+    ocupado = true;
+    boton.setAttribute("aria-busy", "true");
+    try {
+      if (activo) {
+        await apagarDispositivo(yo.uid);
+        poner(false, "Listo: este dispositivo ya no recibirá avisos.");
+      } else {
+        const permiso = await Notification.requestPermission(); // se pide solo al tocar el interruptor
+        if (permiso !== "granted") { poner(false, permiso === "denied" ? TXT_BLOQUEADO : "No se activó: hace falta que permitas las notificaciones."); return; }
+        await guardarToken(yo.uid, await tokenDelDispositivo());
+        poner(true, "¡Listo! Te avisaremos también en este dispositivo.");
+      }
+    } catch (e) {
+      console.warn("avisos del dispositivo:", e.code || e.message);
+      poner(activo, e.message === "sin-soporte" ? "Este navegador no puede recibir avisos en el dispositivo." : "No se pudo cambiar. Inténtalo de nuevo en un momento.");
+    } finally {
+      ocupado = false;
+      boton.removeAttribute("aria-busy");
+    }
+  });
+
+  // Al cerrar sesión, este dispositivo deja de recibir los avisos de esa cuenta.
+  const limpiar = () => { if (activo && auth.currentUser?.uid !== yo.uid) apagarDispositivo(null); };
+  return { el, limpiar };
+}
+
 // Monta la campana en `contenedor` y devuelve la función para quitar el escucha.
 export function montarCampana(contenedor) {
   const yo = auth.currentUser;
@@ -162,6 +311,7 @@ export function montarCampana(contenedor) {
     svgIcono(["M6 9a6 6 0 1 1 12 0c0 6 2.5 7 2.5 7h-17S6 15 6 9Z", "M10 20a2 2 0 0 0 4 0"]), badge);
   const caja = h("div", { class: "campana-caja" }, boton, panel);
   contenedor.replaceChildren(caja);
+  const disp = controlDispositivo(yo);
   let items = [];
   const pintar = () => {
     const sinLeer = items.filter((i) => !i.read);
@@ -179,6 +329,8 @@ export function montarCampana(contenedor) {
           sinLeer.forEach((i) => batch.update(doc(db, "inbox", yo.uid, "items", i.id), { read: true }));
           try { await batch.commit(); } catch (e) { console.warn(e); }
         } }) : null),
+      // El interruptor va arriba: con muchos avisos, al pie quedaría fuera de la vista.
+      disp.el,
       lista.length ? h("div", { class: "campana-lista" }, lista) : h("p", { class: "muted small", text: "No tienes avisos todavía." }));
   };
   boton.addEventListener("click", () => {
@@ -187,11 +339,13 @@ export function montarCampana(contenedor) {
   });
   document.addEventListener("click", (e) => { if (!caja.contains(e.target)) { panel.hidden = true; boton.setAttribute("aria-expanded", "false"); } });
   pintar();
-  return onSnapshot(query(collection(db, "inbox", yo.uid, "items"), limit(100)), (snap) => {
+  // Los 100 más recientes (sin orderBy, Firestore devolvería los 100 primeros por id y los nuevos se perderían).
+  const quitar = onSnapshot(query(collection(db, "inbox", yo.uid, "items"), orderBy("createdAt", "desc"), limit(100)), (snap) => {
     items = snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }))
       .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
     pintar();
   }, (err) => console.warn("avisos:", err.code));
+  return () => { quitar(); disp.limpiar(); };
 }
 
 export function svgIcono(paths, size = 20) {
@@ -234,8 +388,10 @@ function cabecera(activa) {
       label, id === "mensajes" ? h("span", { class: "nav-badge", id: "navMensajes", hidden: true }) : null)));
   const user = h("div", { class: "user", hidden: true },
     h("span", { id: "campana" }),
-    h("img", { id: "user-photo", alt: "", referrerpolicy: "no-referrer", hidden: true }),
-    h("span", { id: "user-name" }),
+    h("a", { class: "user-link", href: "/perfil/", "aria-label": "Mi perfil", title: "Mi perfil" },
+      h("img", { id: "user-photo", alt: "", referrerpolicy: "no-referrer", hidden: true }),
+      h("span", { id: "user-ini", class: "avatar-ini sm", "aria-hidden": "true" }),
+      h("span", { id: "user-name" })),
     h("button", { type: "button", class: "ghost small", text: "Salir", onclick: () => signOut(auth) }));
   const top = h("header", { class: "top" }, h("div", { class: "top-in" },
     h("a", { class: "brand", href: "/" }, marca(), h("span", {}, h("b", { text: "Padrón Perera" }), h("small", { text: "Familia" }))),
@@ -302,13 +458,17 @@ export function iniciarPagina({ activa, raiz, alEntrar, alSalir }) {
         h("button", { type: "button", class: "ghost", text: "Usar otra cuenta", onclick: () => signOut(auth) }));
       return;
     }
+    // merge: no borra lo que el familiar escribió en su perfil ("Sobre mí", ciudad).
     setDoc(doc(db, "profiles", u.uid), {
-      name: (u.displayName || email).slice(0, 120), photoURL: safeUrl(u.photoURL), email, updatedAt: serverTimestamp(),
-    }).catch(() => {});
+      name: nombrePerfil(u, email), photoURL: fotoPerfil(u.photoURL), email,
+      personId: member?.personId || null, updatedAt: serverTimestamp(),
+    }, { merge: true }).catch((e) => console.warn("perfil:", e.code || e.message));
     $("user-name").textContent = u.displayName || email;
     const foto = safeUrl(u.photoURL);
     $("user-photo").hidden = !foto;
     if (foto) $("user-photo").src = foto;
+    $("user-ini").hidden = Boolean(foto);
+    $("user-ini").textContent = initials(u.displayName || email);
     nav.hidden = false;
     user.hidden = false;
     gate.hidden = true;

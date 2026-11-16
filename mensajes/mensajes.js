@@ -2,11 +2,12 @@
 // Solo los participantes de una conversación pueden leerla (reglas de Firestore).
 import {
   iniciarPagina, db, h, $, avatar, timeEl, escucharPerfiles,
-  collection, doc, setDoc, query, where, limit, onSnapshot, serverTimestamp, writeBatch, updateDoc,
+  collection, doc, getDoc, setDoc, query, where, limit, onSnapshot, serverTimestamp, writeBatch, updateDoc,
 } from "/comun/base.js";
 
 const raiz = $("raiz");
-const st = { yo: null, perfiles: new Map(), convs: [], actual: null, msgs: [], unsubMsgs: null };
+const st = { yo: null, perfiles: new Map(), convs: [], actual: null, msgs: [], unsubMsgs: null, conHecho: false };
+const perfilUid = (uid) => `/perfil/?uid=${encodeURIComponent(uid || "")}`;
 
 raiz.append(
   h("div", { class: "pagina-cab" },
@@ -32,8 +33,13 @@ iniciarPagina({
       st.convs = snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }))
         .sort((a, b) => (b.lastAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0) - (a.lastAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0));
       pintarLista();
-      const pedido = new URLSearchParams(location.search).get("c");
-      if (!st.actual && pedido && st.convs.some((c) => c.id === pedido)) abrir(pedido);
+      const params = new URLSearchParams(location.search);
+      const pedido = params.get("c");
+      const con = params.get("con");
+      // ?con=<uid> (desde un perfil): abrir o crear la conversación privada con esa persona.
+      // Se espera a la respuesta del servidor para no duplicar una conversación que ya existe.
+      if (con && !st.conHecho && !snap.metadata.fromCache) { st.conHecho = true; abrirCon(con); }
+      else if (!st.actual && pedido && st.convs.some((c) => c.id === pedido)) abrir(pedido);
       else if (st.actual) pintarCabecera();
     }, (err) => console.error(err));
     $("btnNueva").onclick = nuevaConversacion;
@@ -44,7 +50,8 @@ iniciarPagina({
 function titulo(c) {
   if (c.title) return c.title;
   const otros = (c.members || []).filter((u) => u !== st.yo.uid);
-  const nombres = otros.map((u) => c.info?.[u]?.name || st.perfiles.get(u)?.name || "Familiar");
+  // Primero el nombre del perfil (las reglas lo atan a la cuenta de Google); info solo como respaldo.
+  const nombres = otros.map((u) => st.perfiles.get(u)?.name || c.info?.[u]?.name || "Familiar");
   return nombres.join(", ") || "Solo tú";
 }
 function fotoDe(c) {
@@ -73,9 +80,16 @@ function pintarCabecera() {
   const c = st.convs.find((x) => x.id === st.actual);
   const cab = $("hilo").querySelector(".hilo-cab");
   if (!c || !cab) return;
-  cab.replaceChildren(avatar(titulo(c), fotoDe(c)), h("div", {},
-    h("h2", { text: titulo(c) }),
-    h("span", { class: "tiempo", text: `${(c.members || []).length} participantes` })));
+  const otros = (c.members || []).filter((u) => u !== st.yo.uid);
+  const nombre = (u) => st.perfiles.get(u)?.name || c.info?.[u]?.name || "Familiar";
+  const dm = otros.length === 1 && !c.title;
+  cab.replaceChildren(
+    dm ? h("a", { href: perfilUid(otros[0]), tabindex: "-1", "aria-hidden": "true", class: "hilo-avatar" }, avatar(titulo(c), fotoDe(c))) : avatar(titulo(c), fotoDe(c)),
+    h("div", { class: "hilo-titulo" },
+      h("h2", {}, dm ? h("a", { href: perfilUid(otros[0]), class: "enlace-perfil", text: titulo(c) }) : titulo(c)),
+      dm ? h("a", { href: perfilUid(otros[0]), class: "tiempo", text: "Ver perfil" })
+        : h("span", { class: "tiempo participantes" }, `${(c.members || []).length} participantes: `,
+          ...otros.flatMap((u, i) => [i ? ", " : "", h("a", { href: perfilUid(u), text: nombre(u) })]))));
 }
 
 function abrir(id) {
@@ -120,7 +134,7 @@ function abrir(id) {
     if (!caja) return;
     const alFinal = caja.scrollHeight - caja.scrollTop - caja.clientHeight < 80;
     caja.replaceChildren(...(st.msgs.length ? st.msgs.map((m) => h("div", { class: "msg" + (m.uid === st.yo.uid ? " mio" : "") },
-      m.uid !== st.yo.uid ? h("span", { class: "autor", text: m.name }) : null,
+      m.uid !== st.yo.uid ? h("a", { class: "autor", href: perfilUid(m.uid), text: st.perfiles.get(m.uid)?.name || m.name }) : null,
       h("div", { class: "texto", text: m.text }), timeEl(m.createdAt, "tiempo"))) : [h("div", { class: "vacio", text: "Escribe el primer mensaje." })]));
     if (alFinal || snap.docChanges().length === snap.size) caja.scrollTop = caja.scrollHeight;
     // Marcar como leída.
@@ -128,7 +142,10 @@ function abrir(id) {
     if (c && sinLeer(c)) updateDoc(doc(db, "conversations", id), { [`readBy.${st.yo.uid}`]: serverTimestamp() }).catch(() => {});
   }, (err) => console.error(err));
   if (window.matchMedia("(max-width: 900px)").matches) hilo.scrollIntoView({ block: "start" });
-  history.replaceState(null, "", `?${new URLSearchParams({ ...Object.fromEntries(new URLSearchParams(location.search)), c: id })}`);
+  const q = new URLSearchParams(location.search);
+  q.set("c", id);
+  q.delete("con");
+  history.replaceState(null, "", `?${q}`);
 }
 
 function nuevaConversacion() {
@@ -152,21 +169,8 @@ function nuevaConversacion() {
     e.preventDefault();
     const elegidos = [...lista.querySelectorAll("input:checked")].map((i) => i.value);
     if (!elegidos.length) return;
-    const miembros = [st.yo.uid, ...elegidos];
-    const info = {};
-    miembros.forEach((uid) => {
-      const p = uid === st.yo.uid ? { name: st.yo.displayName || st.yo.email, photoURL: st.yo.photoURL } : st.perfiles.get(uid);
-      info[uid] = { name: String(p?.name || "Familiar").slice(0, 120), photoURL: p?.photoURL && /^https:\/\//.test(p.photoURL) ? p.photoURL : null };
-    });
-    const id = elegidos.length === 1 ? "dm_" + [...miembros].sort().join("_") : doc(collection(db, "conversations")).id;
     try {
-      if (!st.convs.some((c) => c.id === id)) {
-        await setDoc(doc(db, "conversations", id), {
-          members: miembros, info, title: elegidos.length > 1 ? tituloIn.value.trim().slice(0, 80) : "",
-          createdBy: st.yo.uid, createdAt: serverTimestamp(), lastText: "", lastAt: serverTimestamp(), lastFrom: "",
-          readBy: { [st.yo.uid]: serverTimestamp() },
-        });
-      }
+      const id = await crearConversacion(elegidos, tituloIn.value);
       dlg.close();
       abrir(id);
     } catch (err) {
@@ -176,4 +180,49 @@ function nuevaConversacion() {
   });
   dlg.replaceChildren(form);
   dlg.showModal();
+}
+
+// Crea (si no existe) la conversación con `elegidos` y devuelve su id. Uno a uno: id fijo dm_<uids ordenados>.
+async function crearConversacion(elegidos, tituloGrupo = "") {
+  const miembros = [st.yo.uid, ...elegidos];
+  const info = {};
+  miembros.forEach((uid) => {
+    const p = uid === st.yo.uid ? { name: st.yo.displayName || st.yo.email, photoURL: st.yo.photoURL } : st.perfiles.get(uid);
+    info[uid] = { name: String(p?.name || "Familiar").slice(0, 120), photoURL: p?.photoURL && /^https:\/\//.test(p.photoURL) ? p.photoURL : null };
+  });
+  const id = elegidos.length === 1 ? "dm_" + [...miembros].sort().join("_") : doc(collection(db, "conversations")).id;
+  const existente = st.convs.find((c) => c.id === id);
+  if (existente) {
+    // Una conversación privada solo se reutiliza si somos exactamente esas dos personas y no es un grupo.
+    const m = existente.members || [];
+    const privadaOk = m.length === 2 && miembros.every((u) => m.includes(u)) && !existente.title;
+    if (elegidos.length === 1 && !privadaOk) throw Object.assign(new Error("conversación privada alterada"), { code: "conversacion-alterada" });
+  } else {
+    await setDoc(doc(db, "conversations", id), {
+      members: miembros, info, title: elegidos.length > 1 ? String(tituloGrupo).trim().slice(0, 80) : "",
+      createdBy: st.yo.uid, createdAt: serverTimestamp(), lastText: "", lastAt: serverTimestamp(), lastFrom: "",
+      readBy: { [st.yo.uid]: serverTimestamp() },
+    });
+  }
+  return id;
+}
+
+// Abre la conversación privada con `uid` (enlace «Enviar mensaje» del perfil).
+async function abrirCon(uid) {
+  const hilo = $("hilo");
+  const aviso = (texto) => hilo.replaceChildren(h("div", { class: "vacio" }, texto, " ", h("a", { href: "/mensajes/", text: "Ver tus conversaciones" })));
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(uid) || uid === st.yo.uid) { aviso("No se puede abrir esa conversación."); return; }
+  try {
+    if (!st.perfiles.has(uid)) {
+      const p = await getDoc(doc(db, "profiles", uid));
+      if (!p.exists()) { aviso("Esa persona todavía no ha entrado a la red, así que aún no puede recibir mensajes."); return; }
+      st.perfiles.set(uid, p.data());
+    }
+    abrir(await crearConversacion([uid]));
+  } catch (err) {
+    console.warn(err);
+    aviso(err.code === "conversacion-alterada"
+      ? "Esa conversación privada no es solo entre ustedes dos, así que no la abrimos. Avísale a un administrador."
+      : "No se pudo abrir la conversación (" + (err.code || err.message) + ").");
+  }
 }
