@@ -161,6 +161,7 @@ dialog.foto-grande::backdrop { background: rgba(10, 20, 30, .82); }
   .nav { order: 3; width: 100%; }
   .nav a { padding: 0 11px; }
   #user-name { display: none; }
+  .campana-panel { position: fixed; left: 12px; right: 12px; top: 64px; width: auto; }
   .pagina { padding: 18px 14px 48px; }
   .card { padding: 18px; }
   .msg { max-width: 90%; }

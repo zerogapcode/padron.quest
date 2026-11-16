@@ -723,7 +723,7 @@ function pintarGrupos() {
   const ramas = Object.values(state.branches).filter((b) => b.id !== "raiz").sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
   const lista = $("grupos-lista");
   lista.replaceChildren(
-    h("a", { href: "/muro/", class: "grupo" + (GRUPO ? "" : " activo") }, h("span", { class: "punto-color", style: "background:#13293D" }), "Toda la familia Padrón"),
+    h("a", { href: "/muro/", class: "grupo" + (GRUPO ? "" : " activo") }, h("span", { class: "punto-color", style: "background:#13293D" }), "Toda la familia Padrón Perera"),
     ...ramas.map((b) => h("a", { href: `/muro/?grupo=${encodeURIComponent(b.id)}`, class: "grupo" + (GRUPO === b.id ? " activo" : "") },
       h("span", { class: "punto-color", style: `background:${/^#[0-9A-Fa-f]{6}$/.test(b.color) ? b.color : "#56636E"}` }), b.shortLabel)));
   const banner = $("grupo-banner");
@@ -734,6 +734,6 @@ function pintarGrupos() {
       h("b", { text: `Grupo de la rama ${b ? b.shortLabel : ""}` }),
       h("span", { text: b ? ` · ${b.description || b.label}. Lo que publiques aquí lo verá toda la familia, pero se guarda en este grupo.` : " · Este grupo ya no existe." }),
       " ", h("a", { href: "/muro/", text: "Volver al muro de toda la familia" }));
-    document.title = `${b ? b.shortLabel : "Grupo"} · Familia Padrón`;
+    document.title = `${b ? b.shortLabel : "Grupo"} · Familia Padrón Perera`;
   }
 }

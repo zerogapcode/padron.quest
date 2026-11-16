@@ -238,7 +238,7 @@ function cabecera(activa) {
     h("span", { id: "user-name" }),
     h("button", { type: "button", class: "ghost small", text: "Salir", onclick: () => signOut(auth) }));
   const top = h("header", { class: "top" }, h("div", { class: "top-in" },
-    h("a", { class: "brand", href: "/" }, marca(), h("span", {}, h("b", { text: "Padrón" }), h("small", { text: "Familia" }))),
+    h("a", { class: "brand", href: "/" }, marca(), h("span", {}, h("b", { text: "Padrón Perera" }), h("small", { text: "Familia" }))),
     nav, user));
   return { top, nav, user };
 }
@@ -268,7 +268,7 @@ export function iniciarPagina({ activa, raiz, alEntrar, alSalir }) {
   const mostrarLogin = () => {
     const err = h("p", { class: "error", hidden: true });
     gate.replaceChildren(
-      h("h1", {}, "La familia ", h("span", { class: "accent", text: "Padrón" })),
+      h("h1", {}, "La familia ", h("span", { class: "accent", text: "Padrón Perera" })),
       h("p", { class: "muted", text: "Solo para familiares invitados. Entra con tu cuenta de Google." }),
       h("button", { type: "button", class: "primary", text: "Entrar con Google", onclick: async () => {
         err.hidden = true;

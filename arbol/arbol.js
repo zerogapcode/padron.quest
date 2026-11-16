@@ -1,5 +1,5 @@
 // ============================================================================
-// El árbol de los Padrón · padron.quest/arbol
+// El árbol de los Padrón Perera · padron.quest/arbol
 // Firebase Auth (Google) + Firestore. Las reglas de Firestore imponen:
 //   - solo miembros leen el árbol;
 //   - solo administradores escriben `people` (directo o al aprobar);
@@ -1375,7 +1375,7 @@ async function handlePersonFormSubmit(e) {
 }
 
 // ---------------------------------------------------------------------------
-// Importación del árbol (solo admins): filtra la línea Padrón
+// Importación del árbol (solo admins): filtra las líneas Padrón y Perera
 // ---------------------------------------------------------------------------
 const BRANCH_COLORS = ["#1F5673", "#8A5A1E", "#4E7A62", "#7A4F86", "#B0654F", "#3C6E8F", "#6E7F3A", "#A0526B", "#5A6B7A", "#9C7A2E", "#2F6B6B", "#80603A"];
 
@@ -1408,9 +1408,15 @@ function extractPadronLine(all) {
   const root = candidates.map((p) => ({ p, n: descOf(String(p.id)).size })).sort((a, b) => b.n - a.n)[0].p;
   const rootId = String(root.id);
   const desc = descOf(rootId);
+  // Línea Perera: desde el Perera más antiguo hasta los Padrón Perera (y sus hermanos y tíos).
+  const isPerera = (p) => /perera/i.test(p.name || "");
+  const pereraRoot = all.filter((p) => isPerera(p) && !p.fatherId && !p.motherId && !desc.has(String(p.id)))
+    .map((p) => ({ p, n: descOf(String(p.id)).size })).sort((a, b) => b.n - a.n)[0]?.p;
+  const perera = pereraRoot ? descOf(String(pereraRoot.id)) : new Set();
+  const linea = new Set([...desc, ...perera]);
   const spouses = new Set();
-  desc.forEach((id) => (by.get(id).spouses || []).forEach((s) => { const sid = String(s.id); if (by.has(sid) && !desc.has(sid)) spouses.add(sid); }));
-  const keep = new Set([...desc, ...spouses]);
+  linea.forEach((id) => (by.get(id).spouses || []).forEach((s) => { const sid = String(s.id); if (by.has(sid) && !linea.has(sid)) spouses.add(sid); }));
+  const keep = new Set([...linea, ...spouses]);
   const rootGen = Number(root.generation ?? 0);
   const newGen = (p) => Number(p.generation ?? rootGen) - rootGen + 1;
 
@@ -1455,9 +1461,14 @@ function extractPadronLine(all) {
     break;
   }
   raizIds.forEach((id) => { if (!branchOf.has(id)) branchOf.set(id, "raiz"); });
-  // Parejas: la rama de su pareja Padrón.
+  const pereraOnly = [...perera].filter((id) => !desc.has(id));
+  if (pereraOnly.length) {
+    branches.perera = { id: "perera", label: "Raíces Perera", shortLabel: "Perera", color: "#5B4636", description: "Los Perera de Canarias, de quienes vienen los Padrón Perera", order: order++ };
+    pereraOnly.forEach((id) => branchOf.set(id, "perera"));
+  }
+  // Parejas: la rama de su pareja Padrón o Perera.
   spouses.forEach((sid) => {
-    const partner = (by.get(sid).spouses || []).map((s) => String(s.id)).find((x) => desc.has(x));
+    const partner = (by.get(sid).spouses || []).map((s) => String(s.id)).find((x) => linea.has(x));
     branchOf.set(sid, branchOf.get(partner) || "raiz");
   });
 
@@ -1486,7 +1497,7 @@ function extractPadronLine(all) {
 
   const generationsInfo = {};
   [...new Set(people.map((p) => p.generation))].sort((a, b) => a - b).forEach((g) => {
-    const names = people.filter((p) => p.generation === g && desc.has(p.id)).map((p) => p.name);
+    const names = people.filter((p) => p.generation === g && linea.has(p.id)).map((p) => p.name);
     generationsInfo[String(g)] = {
       title: genLabel(g),
       subtitle: names.slice(0, 3).join(" · ") + (names.length > 3 ? ` y ${names.length - 3} más` : ""),
@@ -1503,14 +1514,24 @@ async function importTree(file) {
     const all = parseTreeFile(await file.text(), file.name);
     if (!Array.isArray(all) || all.length === 0) throw new Error("El archivo no contiene una lista de personas.");
     const { people, config } = extractPadronLine(all);
-    if (!confirm(`Se cargarán ${people.length} personas de la línea Padrón (de ${all.length} en el archivo) y reemplazarán el árbol actual. ¿Continuar?`)) { say(""); return; }
+    const existentes = new Map(state.people.map((p) => [p.id, p]));
+    const nuevas = people.filter((p) => !existentes.has(p.id)).length;
+    if (!confirm(`Se cargarán ${people.length} personas de las líneas Padrón y Perera (de ${all.length} en el archivo); ${nuevas} son nuevas. Lo que ya se corrigió en el árbol se conserva. ¿Continuar?`)) { say(""); return; }
     say("Guardando en Firebase…");
-    const keepIds = new Set(people.map((p) => p.id));
     const ops = [];
-    state.people.filter((p) => !keepIds.has(p.id)).forEach((p) => ops.push((b) => b.delete(doc(db, "people", p.id))));
+    // Nunca se borra a nadie. A quien ya está en el árbol solo se le actualiza la rama, la
+    // generación y los vínculos que falten; sus datos (nombre, fechas, notas…) se conservan.
     people.forEach((p) => {
       const { id, ...data } = p;
-      ops.push((b) => b.set(doc(db, "people", id), { ...data, updatedAt: serverTimestamp(), updatedBy: myEmail() }));
+      const viejo = existentes.get(id);
+      const datos = !viejo ? data : {
+        branch: data.branch,
+        generation: data.generation,
+        fatherId: viejo.fatherId || data.fatherId,
+        motherId: viejo.motherId || data.motherId,
+        spouses: [...(viejo.spouses || []), ...data.spouses.filter((s) => !(viejo.spouses || []).some((v) => v.id === s.id))],
+      };
+      ops.push((b) => b.set(doc(db, "people", id), { ...datos, updatedAt: serverTimestamp(), updatedBy: myEmail() }, { merge: true }));
     });
     ops.push((b) => b.set(doc(db, "config", "arbol"), { ...config, updatedAt: serverTimestamp(), updatedBy: myEmail() }));
     ops.push((b) => historyEntry(b, { kind: "import", personId: "", personName: "", before: {}, after: { count: people.length }, note: file.name }));
