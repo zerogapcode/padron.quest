@@ -122,7 +122,7 @@
     .pasos li { display: flex; align-items: center; gap: 14px; }
     .pasos li span:first-child { width: 32px; height: 32px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--oceano-2); color: var(--ocre); font-weight: 700; }
     .contacto { margin: 0; font-size: 15px; color: var(--bruma-2); }
-    .contacto a { color: var(--arena); font-weight: 700; }
+    .contacto a { display: inline-block; padding: 10px 0; color: var(--arena); font-weight: 700; overflow-wrap: anywhere; }
     .garantias { flex: 1 1 300px; min-width: 0; margin: 0; padding: 28px; border-radius: 22px; background: var(--oceano-2); list-style: none; display: flex; flex-direction: column; justify-content: center; gap: 22px; }
     .garantias li { display: flex; gap: 14px; align-items: flex-start; }
     .garantias svg { flex: none; margin-top: 2px; }
@@ -214,8 +214,8 @@
           <h1>La familia<br><span class="serif-acento">Padrón Perera</span></h1>
           <p>Ocho generaciones, de Tenerife a Caracas y de Caracas al mundo. Un lugar privado para reencontrarnos, completar nuestro árbol y no perdernos ningún cumpleaños.</p>
           <div class="acciones">
-            <a class="btn btn-ocre" href="#unirse">Pedir mi invitación</a>
-            <a class="btn btn-borde" href="/muro/">Ya tengo invitación · Entrar</a>
+            <a class="btn btn-ocre" href="#unirse">Quiero entrar</a>
+            <a class="btn btn-borde" href="/muro/">Ya tengo cuenta · Entrar</a>
           </div>
           <p class="aviso">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>
@@ -331,22 +331,21 @@
       <div class="unirse-panel">
         <div class="unirse-texto">
           <h2 id="titulo-unirse">¿Eres <span class="serif-acento">Padrón</span> o <span class="serif-acento">Perera</span>?</h2>
-          <p>Cualquier descendiente de los Padrón o de los Perera, y su pareja, puede pedir su invitación. La red la administra la propia familia y abre por etapas.</p>
+          <p>Cualquier descendiente de los Padrón o de los Perera, y su pareja, puede pedir entrar. La red la administra la propia familia: un administrador revisa cada solicitud.</p>
           <ol class="pasos">
-            <li><span>1</span><span>Pide tu invitación y di qué correo usas (Gmail, Hotmail, iCloud… cualquiera sirve)</span></li>
-            <li><span>2</span><span>Un administrador de la familia te agrega</span></li>
-            <li><span>3</span><span>Entra con Google o con tu correo y una contraseña</span></li>
+            <li><span>1</span><span>Crea tu cuenta con Google o con tu correo (Gmail, Hotmail, iCloud… cualquiera sirve)</span></li>
+            <li><span>2</span><span>Cuéntanos quién eres en la familia</span></li>
+            <li><span>3</span><span>Un administrador aprueba tu entrada</span></li>
           </ol>
           <div class="acciones">
-            <a class="btn btn-ocre" id="pedir" href="#unirse">Pedir mi invitación</a>
-            <a class="btn btn-borde" href="/muro/">Ya tengo invitación · Entrar</a>
+            <a class="btn btn-ocre" id="pedir" href="/muro/?nuevo=1">Empezar</a>
           </div>
           <p class="contacto" id="contacto"></p>
         </div>
         <ul class="garantias">
           <li>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D9A55B" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>
-            <div><b>Solo la familia</b><span>Se entra únicamente con invitación.</span></div>
+            <div><b>Solo la familia</b><span>Cada entrada la aprueba un administrador de la familia.</span></div>
           </li>
           <li>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D9A55B" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16v10H4z"/><path d="M8 11h8M8 14h5"/></svg>
@@ -369,34 +368,32 @@
   </footer>
 
   <script>
-    // ---- Contacto para pedir invitación ----
-    // Las invitaciones las atiende Carmen Luisa, administradora de la red.
+    // ---- ¿Dudas? Contacto con Carmen Luisa, administradora de la red ----
+    // Para entrar NO hace falta escribirle: se crea la cuenta y se pide entrar desde el sitio (botón «Empezar»).
     // WhatsApp: solo dígitos con código de país.
     const WHATSAPP = "584144268290";
     const CORREO = "florez.carmenluisa" + "@" + "gmail.com";
-    const MENSAJE = "Hola, soy de la familia Padrón Perera y quiero mi invitación a padron.quest.\nMi nombre: \nMi correo (el que usaré para entrar): ";
+    const MENSAJE = "Hola, soy de la familia Padrón Perera y tengo una duda sobre padron.quest: ";
 
     (function contacto() {
-      const boton = document.getElementById("pedir");
       const nota = document.getElementById("contacto");
+      if (!WHATSAPP && !CORREO) return;
+      nota.append("¿Dudas? Escríbele a Carmen Luisa ");
       if (WHATSAPP) {
-        boton.href = "https://wa.me/" + WHATSAPP + "?text=" + encodeURIComponent(MENSAJE);
-        boton.target = "_blank"; boton.rel = "noopener";
-        nota.append("Te atiende Carmen Luisa por WhatsApp, con el mensaje ya escrito.");
-        if (CORREO) {
-          const a = document.createElement("a");
-          a.href = "mailto:" + CORREO + "?subject=" + encodeURIComponent("Invitación a padron.quest") + "&body=" + encodeURIComponent(MENSAJE);
-          a.textContent = CORREO;
-          nota.append(document.createElement("br"), "¿Prefieres correo? Escribe a ", a);
-        }
-      } else if (CORREO) {
-        boton.href = "mailto:" + CORREO + "?subject=" + encodeURIComponent("Invitación a padron.quest") + "&body=" + encodeURIComponent(MENSAJE);
-        nota.textContent = "O escribe a " + CORREO;
-      } else {
-        // Sin contacto configurado: no mostrar un botón que no lleva a ningún lado.
-        boton.hidden = true;
-        nota.textContent = "Pídele tu invitación a quien administra la red en tu familia y dile qué correo usas (Gmail, Hotmail, iCloud… cualquiera sirve).";
+        const w = document.createElement("a");
+        w.id = "dudas";
+        w.href = "https://wa.me/" + WHATSAPP + "?text=" + encodeURIComponent(MENSAJE);
+        w.target = "_blank"; w.rel = "noopener";
+        w.textContent = "por WhatsApp";
+        nota.append(w);
       }
+      if (CORREO) {
+        const a = document.createElement("a");
+        a.href = "mailto:" + CORREO + "?subject=" + encodeURIComponent("Duda sobre padron.quest") + "&body=" + encodeURIComponent(MENSAJE);
+        a.textContent = CORREO;
+        nota.append(WHATSAPP ? " o a " : "a ", a);
+      }
+      nota.append(".");
     })();
 
     // ---- Lanzamiento: domingo 15 de noviembre de 2026, 6:00 p. m. en Miami (EST, UTC-5) ----

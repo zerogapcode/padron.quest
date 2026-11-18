@@ -172,6 +172,8 @@ dialog.foto-grande::backdrop { background: rgba(10, 20, 30, .82); }
   .nav { order: 3; width: 100%; }
   .nav a { padding: 0 11px; }
   #user-name { display: none; }
+  /* Con solicitudes pendientes, «Administrar» (y su número) pasa al principio del menú: se ve sin deslizarlo. */
+  .nav a.con-pendientes { order: -1; }
   .campana-panel { position: fixed; left: 12px; right: 12px; top: 64px; width: auto; }
   .pagina { padding: 18px 14px 48px; }
   .card { padding: 18px; }
@@ -235,3 +237,63 @@ dialog.foto-grande::backdrop { background: rgba(10, 20, 30, .82); }
 .acceso .acceso-titulo { margin: 0; font-family: var(--serif); font-size: 28px; font-weight: 600; line-height: 1.15; color: var(--oceano); }
 .acceso-acciones { display: flex; flex-direction: column; gap: 10px; }
 @media (max-width: 640px) { .acceso { padding: 18px; } }
+
+/* ---------- Solicitud de acceso (las tres puertas) ---------- */
+.acceso textarea.entrada { min-height: 96px; resize: vertical; line-height: 1.45; background: var(--arena-2); }
+.acceso textarea.entrada:focus { border-color: var(--atlantico); background: #fff; }
+.acceso .acceso-cuenta { align-self: flex-end; font-size: 14px; color: var(--tinta-suave); }
+.acceso .acceso-resumen { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 14px 16px; border-radius: 14px; background: var(--arena-2); }
+.acceso .acceso-resumen dt { font-size: 14px; font-weight: 700; color: var(--tinta-suave); }
+.acceso .acceso-resumen dd { margin: 0; font-size: 16px; color: var(--tinta); overflow-wrap: anywhere; white-space: pre-wrap; }
+.acceso .acceso-motivo { padding: 12px 14px; border-radius: 12px; background: #FBEAE6; color: var(--tinta); overflow-wrap: anywhere; }
+.acceso .acceso-espera { padding: 12px 14px; border-radius: 12px; background: var(--ocre-claro); color: var(--ocre-texto); font-weight: 600; }
+
+/* ---------- Panel de administración (/admin/) ---------- */
+.admin-pagina { max-width: 980px; }
+.admin-seccion { display: flex; flex-direction: column; gap: 14px; }
+.admin-seccion > h2 { font-size: 24px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.admin-num { min-width: 28px; padding: 2px 10px; border-radius: 999px; background: var(--ocre); color: var(--oceano); font-family: var(--sans); font-size: 15px; font-weight: 700; text-align: center; }
+.admin-num.cero { background: var(--linea-2); color: var(--tinta-suave); }
+.admin-lista { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.solicitud, .miembro { display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--linea); border-radius: 16px; background: #fff; overflow-wrap: anywhere; }
+.solicitud.decidida { background: var(--arena-2); }
+.solicitud-cab, .miembro-cab { display: flex; align-items: flex-start; gap: 12px; }
+.solicitud-cab > div, .miembro-cab > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.solicitud-cab b, .miembro-cab b { font-size: 18px; color: var(--oceano); }
+.solicitud .correo, .miembro .correo { font-size: 15px; color: var(--tinta-suave); }
+.solicitud .relacion { padding: 10px 12px; border-radius: 12px; background: var(--arena-2); white-space: pre-wrap; }
+.solicitud.decidida .relacion { background: #fff; }
+.solicitud .datos { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; font-size: 15px; color: var(--tinta-suave); }
+.solicitud .datos a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; }
+.acciones-fila { display: flex; flex-wrap: wrap; gap: 8px; }
+.acciones-fila > button { flex: 1 1 160px; }
+.chip-estado { flex: none; padding: 3px 10px; border-radius: 999px; font-size: 13.5px; font-weight: 700; background: var(--linea-2); color: var(--tinta-suave); }
+.chip-estado.pendiente { background: var(--ocre-claro); color: var(--ocre-texto); }
+.chip-estado.aprobada { background: var(--drago-claro); color: var(--drago-oscuro); }
+.chip-estado.rechazada { background: #FBEAE6; color: var(--peligro); }
+.chip-estado.admin { background: var(--cielo-claro); color: var(--oceano); }
+.chip-estado.fundador { background: var(--oceano); color: var(--arena); }
+.chip-estado.ya { background: var(--drago-claro); color: var(--drago-oscuro); }
+.selector-persona { display: flex; flex-direction: column; gap: 6px; }
+.selector-persona > span { font-size: 15px; font-weight: 600; color: var(--oceano); }
+.selector-persona input, .selector-persona select, .admin-seccion textarea, .admin-seccion input.entrada { width: 100%; min-height: 46px; padding: 10px 14px; border: 1px solid var(--linea); border-radius: 12px; background: var(--arena-2); font-size: 16px; }
+.selector-persona select { -webkit-appearance: none; appearance: none; padding-right: 40px; color: var(--tinta);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2313293D' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center; }
+.selector-persona small { font-size: 14px; color: var(--tinta-suave); }
+.ficha-actual { font-size: 15px; color: var(--tinta-suave); }
+.ficha-actual b { color: var(--tinta); font-weight: 600; }
+.rechazo { display: flex; flex-direction: column; gap: 8px; }
+.peligro { color: var(--peligro) !important; border-color: #EBC3BA !important; }
+.admin-buscar { max-width: 420px; }
+.admin-nota { font-size: 15px; color: var(--tinta-suave); }
+.admin-aviso { padding: 12px 14px; border-radius: 12px; background: var(--drago-claro); color: var(--drago-oscuro); font-weight: 600; }
+.admin-aviso.error { background: #FBEAE6; color: var(--peligro); }
+/* Confirmación flotante del panel («Aprobaste a…»): siempre a la vista, aunque la tarjeta estuviera abajo. */
+.admin-toast { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 60; transform: translateX(-50%);
+  width: min(520px, calc(100vw - 32px)); padding: 14px 16px; border-radius: 14px; background: var(--drago-oscuro); color: #fff;
+  font-weight: 600; line-height: 1.4; box-shadow: 0 10px 30px rgba(19, 41, 61, .25); }
+.admin-toast[hidden] { display: none; }
+.aprobar-caja { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 14px; background: var(--arena-2); }
+.aprobar-caja .selector-persona input, .aprobar-caja .selector-persona select { background-color: #fff; }
+.admin-pagina details > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 700; color: var(--atlantico); }

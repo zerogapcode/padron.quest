@@ -341,7 +341,7 @@ function abrirEdicion() {
 }
 
 function textoSinFicha() {
-  if (st.isAdmin) return "Para vincular tu cuenta con tu ficha, agrega tu correo en el panel de invitados del muro y elige tu ficha del árbol.";
+  if (st.isAdmin) return "Para vincular tu cuenta con tu ficha, ve a «Administrar» → «Miembros», búscate y toca «Cambiar ficha». Si no te aparece el botón, pídeselo a otro administrador.";
   if (st.fichaPerdida) return "Tu ficha del árbol ya no existe. Pídele a un administrador que te vuelva a vincular.";
   return "Tu cuenta aún no está vinculada a tu ficha del árbol. Pídele a un administrador que la vincule.";
 }

@@ -33,6 +33,7 @@
         <a href="/mensajes/">Mensajes <span class="nav-badge" id="navMensajes" hidden></span></a>
         <a href="/fotos/">Fotos</a>
         <a href="/eventos/">Eventos</a>
+        <a href="/admin/" id="navAdmin" hidden>Administrar <span class="nav-badge" id="navSolicitudes" hidden></span></a>
       </nav>
       <div id="user" class="user" hidden>
         <span id="campana"></span>
@@ -54,20 +55,15 @@
   <!-- Sin sesión -->
   <section id="view-login" class="center" hidden>
     <h1>El muro de la familia <span class="accent">Padrón Perera</span></h1>
-    <p class="muted">Solo para familiares invitados. Entra con Google o con tu correo.</p>
+    <p class="muted">Solo para la familia. Entra o crea tu cuenta con Google o con tu correo.</p>
     <div id="acceso"></div>
   </section>
 
   <!-- Con correo y contraseña: falta confirmar el correo -->
   <section id="view-verify" class="center" hidden></section>
 
-  <!-- Sesión iniciada pero sin invitación -->
-  <section id="view-denied" class="center" hidden>
-    <h1>Aún no estás invitado</h1>
-    <p class="muted">La cuenta <strong id="denied-email"></strong> <span id="denied-text"></span></p>
-    <button id="btn-retry" class="primary" type="button">Volver a intentar</button>
-    <button id="btn-denied-logout" class="ghost" type="button">Usar otro correo</button>
-  </section>
+  <!-- Sesión iniciada pero aún no es de la familia: pide entrar (o ve cómo va su solicitud) -->
+  <section id="view-denied" class="center" hidden></section>
 
   <!-- Muro -->
   <main id="view-wall" class="layout" hidden>
@@ -155,15 +151,9 @@
       </section>
 
       <section class="card admin" id="admin" aria-labelledby="admin-titulo" hidden>
-        <h2 id="admin-titulo" class="titulo-tarjeta">Familiares invitados <span class="muted small" id="member-count"></span></h2>
-        <form id="member-form" class="member-form">
-          <label for="member-email" class="member-label">Correo del familiar (Gmail, Hotmail, iCloud…)</label>
-          <input id="member-email" type="email" inputmode="email" required placeholder="nombre@hotmail.com" autocomplete="off" autocapitalize="off" spellcheck="false">
-          <label for="member-person" class="sr-only">Su ficha en el árbol</label>
-          <select id="member-person"></select>
-          <button class="primary small" type="submit">Invitar</button>
-        </form>
-        <ul id="member-list" class="member-list"></ul>
+        <h2 id="admin-titulo" class="titulo-tarjeta">Administración</h2>
+        <p id="admin-resumen" class="admin-resumen">Revisa quién pide entrar, los miembros y los administradores.</p>
+        <a class="primary small" id="admin-ir" href="/admin/">Abrir el panel</a>
       </section>
     </aside>
   </main>

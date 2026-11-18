@@ -15,7 +15,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
 import {
   auth, db, EMULADOR, avisar, montarCampana, montarContadorMensajes,
-  montarAcceso, vistaConfirmarCorreo, accesoPendiente, comprobarFamilia, TEXTO_NO_INVITADO,
+  montarAcceso, vistaConfirmarCorreo, accesoPendiente, comprobarFamilia, vistaSolicitud, montarContadorSolicitudes, vigilarMiRango,
 } from "/comun/base.js";
 
 // Solo con los emuladores locales: acceso directo para probar que las reglas niegan lo que deben.
@@ -192,10 +192,7 @@ function showGate(which) {
   ["gate-loading", "gate-login", "gate-verify", "gate-denied", "gate-empty"].forEach((id) => { $(id).hidden = id !== which; });
 }
 
-$("deniedText").textContent = TEXTO_NO_INVITADO;
 $("btnLogout").addEventListener("click", () => signOut(auth));
-$("btnLogoutDenied").addEventListener("click", () => signOut(auth));
-$("btnRetry").addEventListener("click", () => auth.currentUser && enter(auth.currentUser));
 
 onAuthStateChanged(auth, (user) => {
   stopListeners();
@@ -221,7 +218,8 @@ async function enter(user) {
   const email = familia.email;
   state.isAdmin = familia.isAdmin;
   if (!familia.isAdmin && !familia.member) {
-    $("deniedEmail").textContent = email;
+    // Aún no es de la familia: pide entrar o ve cómo va su solicitud. Al aprobarla, entra solo.
+    unsubs.push(vistaSolicitud($("gate-denied"), user, (u) => { state.user = u; enter(u); }));
     showGate("gate-denied");
     return;
   }
@@ -234,6 +232,16 @@ async function enter(user) {
   $("btnOpenAdmin").hidden = !state.isAdmin;
   unsubs.push(montarCampana($("campana")));
   unsubs.push(montarContadorMensajes($("navMensajes")));
+  $("navAdmin").hidden = !state.isAdmin;
+  if (state.isAdmin) unsubs.push(montarContadorSolicitudes($("navSolicitudes")));
+  // Si lo quitan de la red o le dan o quitan el rango de administrador con el árbol abierto, vuelve a entrar.
+  if (!familia.esFundador) {
+    unsubs.push(vigilarMiRango(email, state.isAdmin, () => {
+      if (auth.currentUser?.uid !== user.uid) return;
+      stopListeners();
+      enter(user);
+    }));
+  }
 
   try {
     const cfg = await getDoc(doc(db, "config", "arbol"));

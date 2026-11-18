@@ -27,17 +27,13 @@
     </div>
     <div class="gate-card" id="gate-login" hidden>
       <h1>El árbol de los <em>Padrón Perera</em></h1>
-      <p>Solo para familiares invitados. Entra con Google o con tu correo.</p>
+      <p>Solo para la familia. Entra o crea tu cuenta con Google o con tu correo.</p>
       <div id="acceso" class="gate-acceso"></div>
       <a class="btn-gate ghost" href="/">Volver a la portada</a>
     </div>
     <div class="gate-card gate-acceso" id="gate-verify" hidden></div>
-    <div class="gate-card" id="gate-denied" hidden>
-      <h1>Aún no estás invitado</h1>
-      <p>La cuenta <code id="deniedEmail"></code> <span id="deniedText"></span></p>
-      <button type="button" class="btn-gate" id="btnRetry">Volver a intentar</button>
-      <button type="button" class="btn-gate ghost" id="btnLogoutDenied">Usar otro correo</button>
-    </div>
+    <!-- Aún no es de la familia: pide entrar (o ve cómo va su solicitud) -->
+    <div class="gate-card gate-acceso" id="gate-denied" hidden></div>
     <div class="gate-card" id="gate-empty" hidden>
       <h1>El árbol está vacío</h1>
       <p id="emptyText">Todavía no se ha cargado el árbol. Un administrador debe importarlo.</p>
@@ -79,6 +75,7 @@
         <a class="btn" href="/mensajes/">Mensajes <span class="count-badge" id="navMensajes" hidden>0</span></a>
         <a class="btn" href="/fotos/">Fotos</a>
         <a class="btn" href="/eventos/">Eventos</a>
+        <a class="btn" href="/admin/" id="navAdmin" hidden>Administrar <span class="count-badge" id="navSolicitudes" hidden>0</span></a>
         <span id="campana"></span>
         <button type="button" class="btn btn-icon" id="btnThemeToggle" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema claro u oscuro">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>

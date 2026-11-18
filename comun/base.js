@@ -5,11 +5,11 @@ import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebase
 import {
   getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut,
   connectAuthEmulator, signInWithCredential, signInWithEmailAndPassword,
-  sendEmailVerification, sendPasswordResetEmail, updateProfile,
+  sendEmailVerification, updateProfile,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, query, where, limit, orderBy,
-  onSnapshot, serverTimestamp, writeBatch, connectFirestoreEmulator,
+  onSnapshot, serverTimestamp, writeBatch, connectFirestoreEmulator, getDocFromServer, waitForPendingWrites,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
 import {
   getStorage, ref, uploadBytes, getDownloadURL, connectStorageEmulator,
@@ -513,10 +513,10 @@ async function enviarConfirmacion(user) {
 }
 
 // «Crear cuenta» y «¿Olvidaste tu contraseña?» son lo mismo: la contraseña SOLO la elige quien tiene el
-// buzón, con el enlace del correo. Así nadie puede crear de antemano la cuenta de un familiar con una
-// contraseña suya (robo «pre-hijack»). La Cloud Function prepararCuenta deja lista la cuenta de un correo
-// invitado (sin contraseña, con la marca que exigen las reglas) y luego Firebase envía el enlace.
-// Responde igual para cualquier correo: no revela quién está invitado ni quién tiene cuenta.
+// buzón, con el enlace del correo. Así nadie puede crear de antemano la cuenta de otra persona con una
+// contraseña suya (robo «pre-hijack»). La Cloud Function prepararCuenta deja lista la cuenta de CUALQUIER
+// correo (sin contraseña, con la marca que exigen las reglas) y el servidor mismo envía el enlace.
+// Responde siempre igual (también cuando limita los envíos): no revela quién tiene cuenta.
 let prepararRemoto = null;
 function llamarPrepararCuenta(correo) {
   prepararRemoto ||= import("https://www.gstatic.com/firebasejs/13.3.0/firebase-functions.js").then((f) => {
@@ -524,16 +524,10 @@ function llamarPrepararCuenta(correo) {
     if (EMULADOR) f.connectFunctionsEmulator(fns, "127.0.0.1", 5001 + EMU_DESPLAZA);
     return f.httpsCallable(fns, "prepararCuenta");
   }).catch((e) => { prepararRemoto = null; throw e; });
-  return prepararRemoto.then((llamar) => llamar({ correo }));
+  return prepararRemoto.then((llamar) => llamar({ correo, vuelta: urlContinuar() }));
 }
-async function pedirEnlaceClave(correo) {
-  await llamarPrepararCuenta(correo);
-  try { await conVuelta((ajustes) => sendPasswordResetEmail(auth, correo, ajustes)); }
-  catch (e) {
-    // Solo se avisan los problemas de conexión o de formato; nunca si el correo tiene cuenta.
-    if (["auth/network-request-failed", "auth/invalid-email", "auth/too-many-requests"].includes(e.code)) throw e;
-  }
-}
+// Solo se avisan los problemas de conexión o de formato; nunca si el correo tiene cuenta.
+const pedirEnlaceClave = (correo) => llamarPrepararCuenta(correo);
 
 // El nombre que escribió en «Crear cuenta» se guarda en este navegador para proponérselo al entrar.
 const CLAVE_NOMBRE = "padron.nombreNuevo";
@@ -546,6 +540,8 @@ function nombrePendiente(correo) {
 }
 
 const correoValido = (c) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c);
+// El mismo mensaje para cualquier correo (tenga cuenta o no, y aunque el servidor haya limitado los envíos).
+export const TEXTO_ENLACE_ENVIADO = (correo) => `Listo. En unos minutos te llegará a ${correo} un correo con un enlace para elegir tu contraseña. Ábrelo, elige tu contraseña y luego vuelve aquí y toca «Entrar». Si no lo ves, revisa la carpeta de spam o correo no deseado. Si lo pediste hace muy poco, espera unos minutos antes de pedirlo otra vez.`;
 const limpiarCorreo = (c) => c.replace(/\s+/g, "").toLowerCase();
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -591,10 +587,14 @@ function encadenar(campos) {
     vacio.input.focus();
   }));
 }
-// Mensaje bajo el formulario y botón ocupado mientras trabaja.
+// Mensaje bajo el formulario y botón ocupado mientras trabaja. El mensaje se trae a la pantalla: en un teléfono
+// queda debajo del botón, y sin esto quien toca «Crear mi cuenta» no vería que pasó algo.
 function mensajero() {
   const msg = h("p", { class: "acceso-msg", role: "status", "aria-live": "polite", hidden: true });
-  const decir = (texto, tipo = "error") => { msg.textContent = texto; msg.className = "acceso-msg " + tipo; msg.hidden = !texto; };
+  const decir = (texto, tipo = "error") => {
+    msg.textContent = texto; msg.className = "acceso-msg " + tipo; msg.hidden = !texto;
+    if (texto) requestAnimationFrame(() => { if (msg.isConnected && !msg.hidden) msg.scrollIntoView({ block: "nearest" }); });
+  };
   return { msg, decir };
 }
 async function ocupado(boton, texto, fn) {
@@ -627,7 +627,7 @@ export function montarAcceso(contenedor) {
   // --- Crear cuenta: nombre y correo; la contraseña se elige con el enlace del correo ---
   const cNombre = enlazar(campo("Nombre y apellido", { type: "text", autocomplete: "name", autocapitalize: "words", enterkeyhint: "next", maxlength: "80" }));
   const cCorreo = campoCorreo(false);
-  cCorreo.label.append(h("small", { text: "El mismo con el que te invitaron." }));
+  cCorreo.label.append(h("small", { text: "Ahí te llegará el enlace para elegir tu contraseña." }));
   const cBoton = h("button", { type: "submit", class: "primary", text: "Crear mi cuenta" });
   const fCrear = h("form", { class: "acceso-form", novalidate: true, "aria-label": "Crear cuenta con tu correo", hidden: true },
     cNombre.el, cCorreo.el, cBoton,
@@ -694,7 +694,7 @@ export function montarAcceso(contenedor) {
     guardarNombrePendiente(correo, nombre);
     return ocupado(cBoton, "Enviando…", async () => {
       try { await pedirEnlaceClave(correo); } catch (e) { decir(mensajeAcceso(e)); return; }
-      decir(`Listo. Si ${correo} está en la lista de la familia, en unos minutos te llegará un correo con un enlace para crear tu contraseña. Ábrelo, elige tu contraseña y luego vuelve aquí y toca «Entrar». Si no lo ves, revisa la carpeta de spam o correo no deseado.`, "ok");
+      decir(TEXTO_ENLACE_ENVIADO(correo), "ok");
     });
   });
 
@@ -705,7 +705,7 @@ export function montarAcceso(contenedor) {
     decir("");
     return ocupado(rBoton, "Enviando…", async () => {
       try { await pedirEnlaceClave(correo); } catch (e) { decir(mensajeAcceso(e)); return; }
-      decir(`Si ${correo} tiene cuenta, te enviamos un enlace para crear una contraseña nueva. Revisa también la carpeta de spam o correo no deseado.`, "ok");
+      decir(TEXTO_ENLACE_ENVIADO(correo), "ok");
     });
   });
 
@@ -714,7 +714,8 @@ export function montarAcceso(contenedor) {
     h("p", { class: "acceso-o" }, h("span", { text: "o con tu correo" })),
     h("p", { class: "acceso-nota acceso-centro", text: "Gmail, Hotmail, Outlook, Yahoo, iCloud o el de tu trabajo." }),
     modos, fEntrar, fCrear, fOlvide, msg));
-  modo("entrar", false);
+  // «Empezar» de la portada llega con ?nuevo=1: quien es nuevo ve directamente «Crear cuenta».
+  modo(new URLSearchParams(location.search).has("nuevo") ? "crear" : "entrar", false);
 }
 
 // ¿Le falta un paso antes de entrar? Confirmar el correo o, si su cuenta no tiene nombre, escribirlo.
@@ -848,7 +849,9 @@ export async function asegurarToken(user) {
   } catch (e) { console.warn("sesión:", e.code || e.message); }
 }
 
-// ¿Es de la familia? Admin (solo los admins pueden listar members) o invitado en members/{correo en minúsculas}.
+// ¿Es de la familia? Admin (solo los admins pueden listar members) o aprobado en members/{correo en minúsculas}.
+// Los administradores son los fundadores (fijos en las reglas) y los miembros con role 'admin'.
+// `esFundador`: admin sin documento propio o con la marca fundador (las reglas solo dejan ponerla a los fundadores).
 export async function comprobarFamilia(user) {
   await asegurarToken(user);
   const email = (user.email || "").toLowerCase();
@@ -856,11 +859,229 @@ export async function comprobarFamilia(user) {
   try { await getDocs(query(collection(db, "members"), limit(1))); isAdmin = true; } catch { /* no es admin */ }
   let member = null;
   try { const m = await getDoc(doc(db, "members", email)); if (m.exists()) member = m.data(); } catch { /* nada */ }
-  return { email, isAdmin, member };
+  // Un admin que no es fundador SIEMPRE tiene members/{correo} con role 'admin'. Así que un admin sin documento,
+  // o con uno sin ese rango (documento antiguo, de cuando solo había invitaciones), es fundador.
+  const esFundador = isAdmin && (!member || member.fundador === true || member.role !== "admin");
+  // El fundador se marca en su documento (así aparece en «Miembros» como Fundador y puede tener su ficha).
+  // Las reglas solo se lo permiten a los fundadores.
+  if (esFundador && member?.fundador !== true) {
+    const datos = member
+      ? { ...member, fundador: true, role: "admin" }
+      : { fundador: true, role: "admin", addedBy: email, name: (user.displayName || "").slice(0, 200) || null };
+    try { await setDoc(doc(db, "members", email), datos); member = datos; } catch { /* nada: no es fundador */ }
+  }
+  return { email, isAdmin, member, esFundador };
 }
 
-// Texto de "Aún no estás invitado" (las tres puertas).
-export const TEXTO_NO_INVITADO = "no está en la lista de familiares. Si te invitaron con otro correo, toca «Usar otro correo» y entra con ese mismo. Si no, pídele a un administrador de la familia que te agregue.";
+// ---------------------------------------------------------------------------
+// Solicitud de acceso (las tres puertas): quien entra con su cuenta y aún no es de la familia pide entrar
+// (requests/{uid}); un administrador la aprueba o la rechaza. Mientras espera, un escucha en vivo de su
+// propio members/{correo} lo deja entrar SOLO, sin recargar, en cuanto lo aprueban.
+// ---------------------------------------------------------------------------
+export const SOLICITUD = { relacionMax: 300, telefonoMax: 30, nombreMax: 120, esperaReenvioMs: 24 * 3600 * 1000 };
+const fechaLarga = (ts) => {
+  const d = ts?.toDate ? ts.toDate() : ts instanceof Date ? ts : null;
+  return d ? new Intl.DateTimeFormat("es", { dateStyle: "long", timeStyle: "short" }).format(d) : "";
+};
+const limpiarTexto = (t) => String(t || "").replace(/\s+/g, " ").trim();
+
+// Formulario de la solicitud: nombre, «¿Quién eres en la familia?» y teléfono opcional.
+function formSolicitud({ name = "", relacion = "", telefono = "" }, textoBoton, alEnviar, decir) {
+  const cNombre = enlazar(campo("Tu nombre y apellido", { type: "text", autocomplete: "name", autocapitalize: "words", enterkeyhint: "next", maxlength: String(SOLICITUD.nombreMax), name: "nombre" }));
+  cNombre.input.value = name;
+  const idRel = `acceso-${++idCampo}`;
+  const relacionTa = h("textarea", { class: "entrada", id: idRel, rows: "3", maxlength: String(SOLICITUD.relacionMax), autocapitalize: "sentences", name: "relacion",
+    placeholder: "Por ejemplo: nieta de Pedro y Rosa, hija de Marta" });
+  relacionTa.value = relacion;
+  const cuenta = h("small", { class: "acceso-cuenta", "aria-live": "polite" });
+  const contar = () => { cuenta.textContent = `${relacionTa.value.length} de ${SOLICITUD.relacionMax}`; };
+  relacionTa.addEventListener("input", contar);
+  contar();
+  const cRel = h("div", { class: "acceso-campo" },
+    h("label", { class: "campo", for: idRel }, h("span", { text: "¿Quién eres en la familia?" }),
+      h("small", { text: "Di de quién eres hijo, hija, nieto, nieta o pareja. Así el administrador te encuentra en el árbol." })),
+    relacionTa, cuenta);
+  const cTel = enlazar(campo("Teléfono o WhatsApp (opcional)", { type: "tel", inputmode: "tel", autocomplete: "tel", enterkeyhint: "send", maxlength: String(SOLICITUD.telefonoMax), name: "telefono" },
+    "Por si el administrador necesita confirmar quién eres."));
+  cTel.input.value = telefono || "";
+  const boton = h("button", { type: "submit", class: "primary", text: textoBoton });
+  const form = h("form", { class: "acceso-form", novalidate: true, "aria-label": "Tu solicitud" }, cNombre.el, cRel, cTel.el, boton);
+  form.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const datos = { name: limpiarTexto(cNombre.input.value), relacion: limpiarTexto(relacionTa.value), telefono: limpiarTexto(cTel.input.value) };
+    if (datos.name.length < 2) { decir("Escribe tu nombre y apellido."); cNombre.input.focus(); return; }
+    if (datos.relacion.length < 3) { decir("Cuéntanos quién eres en la familia (por ejemplo, de quién eres hijo o nieta)."); relacionTa.focus(); return; }
+    decir("");
+    return ocupado(boton, "Enviando…", () => alEnviar(datos));
+  });
+  return form;
+}
+
+/**
+ * Pantalla de solicitud de acceso en `contenedor` (muro, árbol o iniciarPagina). `alAprobar(user)` se llama
+ * en cuanto existe su members/{correo}. Devuelve la función que suelta los escuchas.
+ */
+export function vistaSolicitud(contenedor, user, alAprobar) {
+  if (!contenedor) return () => {};
+  const email = (user.email || "").toLowerCase();
+  const refSol = doc(db, "requests", user.uid);
+  const { msg, decir } = mensajero();
+  const tarjeta = h("div", { class: "acceso acceso-confirmar acceso-solicitud" }, h("p", { class: "acceso-nota", text: "Cargando…" }));
+  contenedor.replaceChildren(tarjeta);
+  let sol; // undefined: cargando · null: no ha pedido · objeto: su solicitud
+  let editando = false;
+  let terminado = false;
+  let reloj = 0;
+  const quitar = [];
+  const fin = () => {
+    if (terminado) return;
+    terminado = true;
+    clearTimeout(reloj);
+    while (quitar.length) { try { quitar.pop()(); } catch { /* nada */ } }
+  };
+  const otraCuenta = () => h("button", { type: "button", class: "enlace-boton acceso-enlace", text: "Usar otra cuenta", onclick: () => { fin(); signOut(auth); } });
+  const icono = (paths) => h("span", { class: "acceso-icono", "aria-hidden": "true" }, svgIcono(paths, 28));
+  const ICONO_FAMILIA = ["M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z", "M2.5 20a6.5 6.5 0 0 1 13 0", "M16 11a3 3 0 1 0 0-6", "M18 20a5.5 5.5 0 0 0-3-4.9"];
+  const ICONO_RELOJ = ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z", "M12 7v5l3 2"];
+  const cuentaDe = () => h("p", { class: "acceso-nota" }, "Entraste como ", h("strong", { class: "acceso-correo", text: email }), ".");
+  const errorAlGuardar = (e) => (e?.code === "permission-denied"
+    ? "No se pudo guardar. Si tu solicitud fue rechazada hace poco, todavía no puedes enviarla de nuevo. Recarga la página e inténtalo más tarde."
+    : mensajeAcceso(e));
+
+  const resumen = (s) => h("dl", { class: "acceso-resumen" },
+    h("div", {}, h("dt", { text: "Nombre" }), h("dd", { text: s.name || "" })),
+    h("div", {}, h("dt", { text: "Quién eres en la familia" }), h("dd", { text: s.relacion || "" })),
+    s.telefono ? h("div", {}, h("dt", { text: "Teléfono o WhatsApp" }), h("dd", { text: s.telefono })) : null,
+    s.createdAt ? h("div", {}, h("dt", { text: "Enviada" }), h("dd", { text: fechaLarga(s.createdAt) })) : null);
+
+  const pintar = () => {
+    if (terminado || !tarjeta.isConnected) { fin(); return; }
+    clearTimeout(reloj);
+    decir("");
+    if (sol === undefined) return;
+    const valores = { name: sol?.name || user.displayName || "", relacion: sol?.relacion || "", telefono: sol?.telefono || "" };
+
+    if (sol === null) {
+      const form = formSolicitud(valores, "Enviar mi solicitud", async (d) => {
+        try {
+          await setDoc(refSol, { uid: user.uid, email, name: d.name, relacion: d.relacion, ...(d.telefono ? { telefono: d.telefono } : {}), status: "pending", createdAt: serverTimestamp() });
+        } catch (e) { decir(errorAlGuardar(e)); }
+      }, decir);
+      const nombre = (user.displayName || "").split(/\s+/)[0];
+      tarjeta.replaceChildren(icono(ICONO_FAMILIA),
+        h("h1", { class: "acceso-titulo", text: "Pide entrar a la familia" }),
+        h("p", { class: "acceso-texto", text: `${nombre ? `Hola, ${nombre}. ` : ""}Para ver el muro, el árbol y las fotos, un administrador de la familia tiene que aprobar tu entrada. Cuéntanos quién eres.` }),
+        cuentaDe(), form, msg, otraCuenta());
+      return;
+    }
+
+    if (sol.status === "pending") {
+      if (editando) {
+        const form = formSolicitud(valores, "Guardar cambios", async (d) => {
+          try {
+            await updateDoc(refSol, { name: d.name, relacion: d.relacion, telefono: d.telefono || null });
+            editando = false;
+            pintar();
+            decir("Listo: guardamos tus cambios.", "ok");
+          } catch (e) { decir(errorAlGuardar(e)); }
+        }, decir);
+        tarjeta.replaceChildren(icono(ICONO_RELOJ),
+          h("h1", { class: "acceso-titulo", text: "Corrige tu solicitud" }),
+          form, msg,
+          h("button", { type: "button", class: "ghost", text: "Cancelar", onclick: () => { editando = false; pintar(); } }),
+          otraCuenta());
+        return;
+      }
+      tarjeta.replaceChildren(icono(ICONO_RELOJ),
+        h("h1", { class: "acceso-titulo", text: "Tu solicitud está en revisión" }),
+        h("p", { class: "acceso-texto", text: "Un administrador de la familia la revisará pronto. Cuando la apruebe, entrarás aquí mismo, sin hacer nada más. También puedes cerrar y volver más tarde." }),
+        resumen(sol), cuentaDe(),
+        h("div", { class: "acceso-acciones" },
+          h("button", { type: "button", class: "ghost", text: "Corregir mis datos", onclick: () => { editando = true; pintar(); } })),
+        msg, otraCuenta());
+      return;
+    }
+
+    // Rechazada (o aprobada antes y luego quitada de la red): puede enviarla de nuevo pasadas 24 h de la decisión.
+    const rechazada = sol.status !== "approved";
+    const decidida = sol.decidedAt?.toMillis?.() || 0;
+    const desde = decidida + SOLICITUD.esperaReenvioMs;
+    const puede = Date.now() >= desde;
+    const partes = [icono(ICONO_FAMILIA),
+      h("h1", { class: "acceso-titulo", text: rechazada ? "Tu solicitud no fue aprobada" : "Ya no estás en la red de la familia" })];
+    if (rechazada && sol.motivo) partes.push(h("p", { class: "acceso-texto acceso-motivo" }, h("b", { text: "Motivo: " }), sol.motivo));
+    else if (rechazada) partes.push(h("p", { class: "acceso-texto", text: "El administrador no dejó un motivo." }));
+    if (puede) {
+      partes.push(h("p", { class: "acceso-texto", text: "Si crees que es un error, revisa tus datos y envíala de nuevo." }),
+        formSolicitud(valores, "Enviar de nuevo", async (d) => {
+          try {
+            await updateDoc(refSol, { name: d.name, relacion: d.relacion, telefono: d.telefono || null, status: "pending", createdAt: serverTimestamp() });
+          } catch (e) { decir(errorAlGuardar(e)); }
+        }, decir));
+    } else {
+      partes.push(h("p", { class: "acceso-texto acceso-espera", text: `Podrás enviarla de nuevo a partir del ${fechaLarga(new Date(desde))}.` }));
+      // Cuando llegue la hora, la pantalla se actualiza sola.
+      const falta = desde - Date.now();
+      if (falta < 2 ** 31 - 1) reloj = setTimeout(pintar, falta + 500);
+    }
+    partes.push(cuentaDe(), msg, otraCuenta());
+    tarjeta.replaceChildren(...partes);
+  };
+
+  // Aprobado: existe su members/{correo} (las reglas le dejan leer SOLO el suyo).
+  quitar.push(onSnapshot(doc(db, "members", email), (s) => {
+    // Solo lo que confirmó el servidor: una escritura local rechazada (p. ej. alguien que intenta crearse su
+    // members desde la consola) no lo deja «entrar» ni un instante.
+    if (s.exists() && !s.metadata.hasPendingWrites && !terminado) { fin(); alAprobar(auth.currentUser || user); }
+  }, (e) => console.warn("aprobación:", e.code || e.message)));
+  quitar.push(onSnapshot(refSol, (s) => {
+    const nuevo = s.exists() ? s.data({ serverTimestamps: "estimate" }) : null;
+    const cambio = sol === undefined || (sol?.status || null) !== (nuevo?.status || null);
+    sol = nuevo;
+    if (cambio) editando = false;
+    if (cambio || !editando) {
+      // No se repinta encima de lo que está escribiendo (p. ej. el formulario de reenvío).
+      const escribiendo = tarjeta.contains(document.activeElement) && /INPUT|TEXTAREA/.test(document.activeElement?.tagName || "");
+      if (cambio || !escribiendo) pintar();
+    }
+  }, (e) => { console.warn("solicitud:", e.code || e.message); if (sol === undefined) { sol = null; pintar(); } }));
+  return fin;
+}
+
+// Número de solicitudes de acceso pendientes (solo admins). `alCambiar(n)` opcional.
+// Con solicitudes pendientes, el enlace «Administrar» lleva la clase `con-pendientes`: en el teléfono pasa al
+// principio del menú (si no, quedaría fuera del borde derecho y el admin no vería el número).
+export function montarContadorSolicitudes(span, alCambiar) {
+  const enlace = span?.closest("a");
+  return onSnapshot(query(collection(db, "requests"), where("status", "==", "pending"), limit(300)), (snap) => {
+    if (span) { span.textContent = String(snap.size); span.hidden = snap.size === 0; }
+    if (enlace) {
+      enlace.classList.toggle("con-pendientes", snap.size > 0);
+      enlace.setAttribute("aria-label", snap.size ? `Administrar: ${snap.size} ${snap.size === 1 ? "solicitud pendiente" : "solicitudes pendientes"}` : "Administrar");
+    }
+    alCambiar?.(snap.size);
+  }, (e) => console.warn("solicitudes:", e.code || e.message));
+}
+
+/**
+ * Vigila el propio members/{correo} (de quien NO es fundador): si lo quitan de la red o le dan o quitan el rango
+ * de administrador con la página abierta, llama a `alCambiar()` (una vez) para volver a entrar con lo nuevo.
+ * Se confirma con el servidor: una escritura local que las reglas rechazan no cuenta.
+ */
+export function vigilarMiRango(email, isAdmin, alCambiar) {
+  let hecho = false;
+  const ref = doc(db, "members", email);
+  const igual = (d) => d.exists() && (d.data().role === "admin") === Boolean(isAdmin);
+  const avisar = () => { if (!hecho) { hecho = true; alCambiar(); } };
+  const quitar = onSnapshot(ref, (s) => {
+    if (hecho || s.metadata.hasPendingWrites || igual(s)) return;
+    waitForPendingWrites(db).catch(() => {})
+      .then(() => getDocFromServer(ref))
+      .then((d) => { if (!igual(d)) avisar(); })
+      .catch(avisar);
+  }, () => {});
+  return () => { hecho = true; quitar(); };
+}
 
 // ---------------------------------------------------------------------------
 // Página estándar: cabecera + acceso + arranque
@@ -872,11 +1093,15 @@ export const SECCIONES = [
   ["fotos", "/fotos/", "Fotos"],
   ["eventos", "/eventos/", "Eventos"],
 ];
+// Enlace «Administrar» (solo se ve si eres administrador), con el número de solicitudes pendientes.
+export const ENLACE_ADMIN = ["admin", "/admin/", "Administrar"];
 
 function cabecera(activa) {
   const nav = h("nav", { class: "nav", "aria-label": "Principal", hidden: true },
     SECCIONES.map(([id, href, label]) => h("a", { href, "aria-current": id === activa ? "page" : null },
-      label, id === "mensajes" ? h("span", { class: "nav-badge", id: "navMensajes", hidden: true }) : null)));
+      label, id === "mensajes" ? h("span", { class: "nav-badge", id: "navMensajes", hidden: true }) : null)),
+    h("a", { href: ENLACE_ADMIN[1], id: "navAdmin", hidden: true, "aria-current": activa === ENLACE_ADMIN[0] ? "page" : null },
+      ENLACE_ADMIN[2], h("span", { class: "nav-badge", id: "navSolicitudes", hidden: true })));
   const user = h("div", { class: "user", hidden: true },
     h("span", { id: "campana" }),
     h("a", { class: "user-link", href: "/perfil/", "aria-label": "Mi perfil", title: "Mi perfil" },
@@ -916,21 +1141,28 @@ export function iniciarPagina({ activa, raiz, alEntrar, alSalir }) {
     const acceso = h("div");
     gate.replaceChildren(
       h("h1", {}, "La familia ", h("span", { class: "accent", text: "Padrón Perera" })),
-      h("p", { class: "muted", text: "Solo para familiares invitados. Entra con Google o con tu correo." }),
+      h("p", { class: "muted", text: "Solo para la familia. Entra o crea tu cuenta con Google o con tu correo." }),
       acceso);
     montarAcceso(acceso);
   };
 
   const entrar = async (u) => {
     gate.replaceChildren(h("p", { class: "muted", text: "Cargando…" }));
-    const { email, isAdmin, member } = await comprobarFamilia(u);
+    const { email, isAdmin, member, esFundador } = await comprobarFamilia(u);
     if (auth.currentUser?.uid !== u.uid) return; // cerró sesión mientras tanto
+    let reentrando = false;
+    const reentrar = () => { if (reentrando || auth.currentUser?.uid !== u.uid) return; reentrando = true;
+      limpiar();
+      raiz.hidden = true; gate.hidden = false; nav.hidden = true; user.hidden = true;
+      entrar(u);
+    };
     if (!isAdmin && !member) {
-      gate.replaceChildren(h("h1", { text: "Aún no estás invitado" }),
-        h("p", { class: "muted" }, "La cuenta ", h("strong", { text: email }), " " + TEXTO_NO_INVITADO),
-        h("button", { type: "button", class: "ghost", text: "Usar otro correo", onclick: () => signOut(auth) }));
+      // Aún no es de la familia: pide entrar (o ve cómo va su solicitud). Al aprobarla, entra solo.
+      limpiezas.push(vistaSolicitud(gate, u, (yo) => entrar(yo)));
       return;
     }
+    // Si lo quitan de la red o le cambian el rango con la página abierta, vuelve a entrar (sin recargar).
+    if (!esFundador) limpiezas.push(vigilarMiRango(email, isAdmin, reentrar));
     // merge: no borra lo que el familiar escribió en su perfil ("Sobre mí", ciudad).
     setDoc(doc(db, "profiles", u.uid), {
       name: nombrePerfil(u, email), photoURL: fotoPerfil(u.photoURL), email,
@@ -948,7 +1180,9 @@ export function iniciarPagina({ activa, raiz, alEntrar, alSalir }) {
     raiz.hidden = false;
     limpiezas.push(montarCampana($("campana")));
     limpiezas.push(montarContadorMensajes($("navMensajes")));
-    const extra = await alEntrar({ user: u, isAdmin, member });
+    $("navAdmin").hidden = !isAdmin;
+    if (isAdmin) limpiezas.push(montarContadorSolicitudes($("navSolicitudes")));
+    const extra = await alEntrar({ user: u, isAdmin, member, esFundador });
     if (typeof extra === "function") limpiezas.push(extra);
   };
 

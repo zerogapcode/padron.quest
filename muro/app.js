@@ -1,7 +1,7 @@
 // Muro de la familia Padrón — Firebase Auth (Google o cualquier correo) + Firestore + Storage.
-// La seguridad la imponen las reglas de Firestore/Storage: solo miembros invitados
+// La seguridad la imponen las reglas de Firestore/Storage: solo los miembros aprobados
 // leen y publican; cada quien solo marca su propio "me gusta"; solo los
-// administradores gestionan la lista de invitados.
+// administradores aprueban solicitudes y gestionan los miembros (en /admin/).
 import {
   onAuthStateChanged, signOut,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
@@ -14,7 +14,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-storage.js";
 import {
   auth, db, storage, EMULADOR, avisar, montarCampana, montarContadorMensajes, fotoPerfil, nombrePerfil, comprimirFoto, subirFoto,
-  montarAcceso, vistaConfirmarCorreo, accesoPendiente, comprobarFamilia, TEXTO_NO_INVITADO,
+  montarAcceso, vistaConfirmarCorreo, accesoPendiente, comprobarFamilia, vistaSolicitud, montarContadorSolicitudes, vigilarMiRango,
 } from "/comun/base.js";
 
 if (EMULADOR) window.__db = { db, doc, updateDoc, arrayUnion, setDoc, getDoc };
@@ -32,7 +32,6 @@ const state = {
   rootId: null,
   posts: [],
   comments: new Map(),
-  members: [],
   profiles: new Map(),
   branches: {},
   pendingProposals: 0,
@@ -143,9 +142,6 @@ const views = ["view-loading", "view-login", "view-verify", "view-denied", "view
 function show(view) { views.forEach((v) => ($(v).hidden = v !== view)); }
 
 $("btn-logout").addEventListener("click", () => signOut(auth));
-$("btn-denied-logout").addEventListener("click", () => signOut(auth));
-$("btn-retry").addEventListener("click", () => auth.currentUser && enter(auth.currentUser));
-$("denied-text").textContent = TEXTO_NO_INVITADO;
 
 onAuthStateChanged(auth, (user) => {
   while (unsubs.length) { try { unsubs.pop()(); } catch { /* nada */ } }
@@ -179,12 +175,13 @@ function mostrarUsuario(user, nombre) {
 
 async function enter(user) {
   show("view-loading");
-  const { email, isAdmin, member } = await comprobarFamilia(user);
+  const { email, isAdmin, member, esFundador } = await comprobarFamilia(user);
   if (auth.currentUser?.uid !== user.uid) return; // cerró sesión mientras tanto
   state.isAdmin = isAdmin;
   state.member = member;
   if (!state.isAdmin && !state.member) {
-    $("denied-email").textContent = email;
+    // Aún no es de la familia: pide entrar o ve cómo va su solicitud. Al aprobarla, entra solo.
+    unsubs.push(vistaSolicitud($("view-denied"), user, (u) => { state.user = u; mostrarUsuario(u); enter(u); }));
     show("view-denied");
     return;
   }
@@ -198,6 +195,14 @@ async function enter(user) {
 
   $("nav").hidden = false;
   $("admin").hidden = !state.isAdmin;
+  $("navAdmin").hidden = !state.isAdmin;
+  if (state.isAdmin) {
+    unsubs.push(montarContadorSolicitudes($("navSolicitudes"), (n) => {
+      $("admin-resumen").textContent = n === 0 ? "No hay solicitudes de acceso pendientes."
+        : n === 1 ? "1 persona pide entrar a la familia." : `${n} personas piden entrar a la familia.`;
+      $("admin-ir").textContent = n ? "Revisar solicitudes" : "Abrir el panel";
+    }));
+  }
   unsubs.push(montarCampana($("campana")));
   unsubs.push(montarContadorMensajes($("navMensajes")));
   $("composer-avatar").replaceChildren(avatar(user.displayName || email, user.photoURL, "avatar-ini"));
@@ -219,7 +224,7 @@ async function enter(user) {
       .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
     renderFeed();
     renderSaludo();
-  }, (err) => { console.error(err); $("feed").textContent = "No se pudo cargar el muro (" + err.code + ")."; }));
+  }, (err) => { fallo("muro")(err); $("feed").textContent = "No se pudo cargar el muro (" + err.code + ")."; }));
 
   unsubs.push(onSnapshot(query(collectionGroup(db, "comments"), limit(1000)), (snap) => {
     const map = new Map();
@@ -231,19 +236,18 @@ async function enter(user) {
     map.forEach((list) => list.sort((a, b) => (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0)));
     state.comments = map;
     renderFeed();
-  }, (err) => console.error("comentarios:", err)));
+  }, fallo("comentarios")));
 
   unsubs.push(onSnapshot(collection(db, "profiles"), (snap) => {
     state.profiles = new Map(snap.docs.map((d) => [d.id, d.data()]));
     renderFeed();
-  }, (err) => console.error("perfiles:", err)));
+  }, fallo("perfiles")));
 
   unsubs.push(onSnapshot(collection(db, "people"), (snap) => {
     state.people = new Map(snap.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
     renderSide();
     renderSaludo();
-    if (state.isAdmin) renderMembers();
-  }, (err) => console.error("árbol:", err)));
+  }, fallo("árbol")));
 
   const propQ = state.isAdmin
     ? query(collection(db, "proposals"), where("status", "==", "pending"))
@@ -253,17 +257,24 @@ async function enter(user) {
     $("navProposals").textContent = String(snap.size);
     $("navProposals").hidden = !state.isAdmin || snap.size === 0;
     renderSaludo();
-  }, (err) => console.error("propuestas:", err)));
+  }, fallo("propuestas")));
 
-  if (state.isAdmin) {
-    unsubs.push(onSnapshot(collection(db, "members"), (snap) => {
-      state.members = snap.docs.map((d) => ({ email: d.id, ...d.data() })).sort((a, b) => a.email.localeCompare(b.email));
-      renderMembers();
-    }, (err) => console.error("miembros:", err)));
+  // Si un administrador lo quita de la red (vuelve a la pantalla de solicitud) o le da o quita el rango de
+  // administrador (aparece o desaparece «Administrar») con el muro abierto, vuelve a entrar sin recargar.
+  if (!esFundador) {
+    unsubs.push(vigilarMiRango(email, state.isAdmin, () => {
+      if (auth.currentUser?.uid !== user.uid) return;
+      while (unsubs.length) { try { unsubs.pop()(); } catch { /* nada */ } }
+      enter(user);
+    }));
   }
   renderSaludo();
   renderSide();
 }
+
+// Error de un escucha. «permission-denied» es lo esperado si a esta persona la acaban de quitar de la red
+// (el escucha de su members/{correo} la lleva a la pantalla de solicitud): no es un fallo del sitio.
+const fallo = (que) => (err) => (err?.code === "permission-denied" ? console.warn : console.error)(que + ":", err?.code || err);
 
 // ---------------------------------------------------------------------------
 // Saludo
@@ -625,66 +636,6 @@ function renderSide() {
     barras.append(h("p", { class: "muted small", text: "El árbol todavía no se ha cargado." }));
   }
 }
-
-// ---------------------------------------------------------------------------
-// Administración de invitados (solo admins)
-// ---------------------------------------------------------------------------
-function opcionesPersonas(seleccion) {
-  const personas = [...state.people.values()].sort((a, b) => a.name.localeCompare(b.name, "es"));
-  return [h("option", { value: "", text: "— Sin vincular a una ficha —" }),
-    ...personas.map((p) => { const o = h("option", { value: p.id, text: p.name }); if (p.id === seleccion) o.selected = true; return o; })];
-}
-
-function renderMembers() {
-  if (!state.isAdmin) return;
-  const sel = $("member-person");
-  const actual = sel.value;
-  sel.replaceChildren(...opcionesPersonas(actual));
-  $("member-count").textContent = `(${state.members.length})`;
-  const list = $("member-list");
-  if (!state.members.length) {
-    list.replaceChildren(h("li", { class: "muted small", text: "Aún no hay invitados." }));
-    return;
-  }
-  list.replaceChildren(...state.members.map((m) => {
-    const s = h("select", { "aria-label": `Ficha del árbol de ${m.email}` }, ...opcionesPersonas(m.personId));
-    s.addEventListener("change", async () => {
-      const persona = state.people.get(s.value);
-      try {
-        await setDoc(doc(db, "members", m.email), { personId: persona ? persona.id : null, name: persona ? persona.name : null }, { merge: true });
-      } catch (err) { alert("No se pudo vincular: " + (err.code || err.message)); }
-    });
-    return h("li", {},
-      h("div", { class: "fila" }, h("span", { text: m.email }),
-        h("button", { type: "button", class: "ghost small", text: "Quitar", onclick: async () => {
-          if (!confirm(`¿Quitar el acceso de ${m.email}?`)) return;
-          try { await deleteDoc(doc(db, "members", m.email)); } catch (err) { alert("No se pudo quitar: " + (err.code || err.message)); return; }
-          // Su perfil deja de aparecer en la red (y vinculado a su ficha del árbol).
-          try {
-            const ps = await getDocs(query(collection(db, "profiles"), where("email", "==", m.email)));
-            await Promise.all(ps.docs.map((d) => deleteDoc(d.ref)));
-          } catch (err) { console.warn("perfil del invitado:", err.code || err.message); }
-        } })),
-      s);
-  }));
-}
-
-$("member-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const email = $("member-email").value.replace(/\s+/g, "").toLowerCase(); // el id de members/ es el correo en minúsculas
-  if (!email) return;
-  const persona = state.people.get($("member-person").value);
-  try {
-    await setDoc(doc(db, "members", email), {
-      addedAt: serverTimestamp(), addedBy: myEmail(),
-      personId: persona ? persona.id : null, name: persona ? persona.name : null,
-    });
-    $("member-email").value = "";
-    $("member-person").value = "";
-  } catch (err) {
-    alert("No se pudo invitar: " + (err.code || err.message));
-  }
-});
 
 // ---------------------------------------------------------------------------
 // Grupos por rama
