@@ -1,9 +1,9 @@
-// Muro de la familia Padrón — Firebase Auth (Google) + Firestore + Storage.
+// Muro de la familia Padrón — Firebase Auth (Google o cualquier correo) + Firestore + Storage.
 // La seguridad la imponen las reglas de Firestore/Storage: solo miembros invitados
 // leen y publican; cada quien solo marca su propio "me gusta"; solo los
 // administradores gestionan la lista de invitados.
 import {
-  GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut,
+  onAuthStateChanged, signOut,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 import {
   collection, collectionGroup, doc, getDoc, getDocs, setDoc, deleteDoc, addDoc, updateDoc,
@@ -12,7 +12,10 @@ import {
 import {
   ref, deleteObject,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-storage.js";
-import { auth, db, storage, EMULADOR, avisar, montarCampana, montarContadorMensajes, fotoPerfil, nombrePerfil, comprimirFoto, subirFoto } from "/comun/base.js";
+import {
+  auth, db, storage, EMULADOR, avisar, montarCampana, montarContadorMensajes, fotoPerfil, nombrePerfil, comprimirFoto, subirFoto,
+  montarAcceso, vistaConfirmarCorreo, accesoPendiente, comprobarFamilia, TEXTO_NO_INVITADO,
+} from "/comun/base.js";
 
 if (EMULADOR) window.__db = { db, doc, updateDoc, arrayUnion, setDoc, getDoc };
 
@@ -136,65 +139,56 @@ const fechaCorta = (f) => `${f.d} de ${MESES_LARGOS[f.m]}`;
 // ---------------------------------------------------------------------------
 // Acceso
 // ---------------------------------------------------------------------------
-const views = ["view-loading", "view-login", "view-denied", "view-wall"];
+const views = ["view-loading", "view-login", "view-verify", "view-denied", "view-wall"];
 function show(view) { views.forEach((v) => ($(v).hidden = v !== view)); }
 
-$("btn-login").addEventListener("click", async () => {
-  $("login-error").hidden = true;
-  const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: "select_account" });
-  try {
-    await signInWithPopup(auth, provider);
-  } catch (err) {
-    if (err.code === "auth/popup-blocked" || err.code === "auth/operation-not-supported-in-this-environment") {
-      await signInWithRedirect(auth, provider);
-      return;
-    }
-    if (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") return;
-    $("login-error").textContent = "No se pudo iniciar sesión: " + (err.code || err.message);
-    $("login-error").hidden = false;
-  }
-});
 $("btn-logout").addEventListener("click", () => signOut(auth));
+$("btn-denied-logout").addEventListener("click", () => signOut(auth));
 $("btn-retry").addEventListener("click", () => auth.currentUser && enter(auth.currentUser));
+$("denied-text").textContent = TEXTO_NO_INVITADO;
 
 onAuthStateChanged(auth, (user) => {
   while (unsubs.length) { try { unsubs.pop()(); } catch { /* nada */ } }
   state.user = user;
+  $("user").hidden = true;
+  $("nav").hidden = true;
   if (!user) {
-    $("user").hidden = true;
-    $("nav").hidden = true;
+    montarAcceso($("acceso"));
     show("view-login");
     return;
   }
+  // Con correo y contraseña: primero confirmar el correo (las reglas no dejan leer nada antes) y poner su nombre.
+  if (accesoPendiente(user)) {
+    vistaConfirmarCorreo($("view-verify"), user, (u) => { state.user = u; mostrarUsuario(u); enter(u); });
+    show("view-verify");
+    return;
+  }
+  mostrarUsuario(user);
+  enter(user);
+});
+
+function mostrarUsuario(user, nombre) {
   $("user").hidden = false;
-  $("user-name").textContent = user.displayName || user.email;
+  $("user-name").textContent = user.displayName || nombre || user.email;
   const photo = safeUrl(user.photoURL);
   $("user-photo").hidden = !photo;
   if (photo) $("user-photo").src = photo;
   $("user-ini").hidden = Boolean(photo);
-  $("user-ini").textContent = initials(user.displayName || user.email);
-  enter(user);
-});
+  $("user-ini").textContent = initials(user.displayName || nombre || user.email);
+}
 
 async function enter(user) {
   show("view-loading");
-  const email = (user.email || "").toLowerCase();
-  state.isAdmin = false;
-  try {
-    await getDocs(query(collection(db, "members"), limit(1)));
-    state.isAdmin = true; // solo los administradores pueden listar miembros
-  } catch { /* no es admin */ }
-  state.member = null;
-  try {
-    const m = await getDoc(doc(db, "members", email));
-    if (m.exists()) state.member = m.data();
-  } catch { /* sin acceso */ }
+  const { email, isAdmin, member } = await comprobarFamilia(user);
+  if (auth.currentUser?.uid !== user.uid) return; // cerró sesión mientras tanto
+  state.isAdmin = isAdmin;
+  state.member = member;
   if (!state.isAdmin && !state.member) {
     $("denied-email").textContent = email;
     show("view-denied");
     return;
   }
+  if (!user.displayName && member?.name) mostrarUsuario(user, member.name);
 
   // Perfil dentro de la familia (nombre, foto y ficha del árbol). Con merge para no borrar su "Sobre mí".
   setDoc(doc(db, "profiles", user.uid), {
@@ -677,7 +671,7 @@ function renderMembers() {
 
 $("member-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const email = $("member-email").value.trim().toLowerCase();
+  const email = $("member-email").value.replace(/\s+/g, "").toLowerCase(); // el id de members/ es el correo en minúsculas
   if (!email) return;
   const persona = state.people.get($("member-person").value);
   try {

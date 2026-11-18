@@ -194,3 +194,44 @@ dialog.foto-grande::backdrop { background: rgba(10, 20, 30, .82); }
 .disp-interruptor[aria-checked="true"] .disp-pista::after { transform: translateX(20px); }
 .disp-nota { padding: 6px 10px 2px; font-size: 15px; line-height: 1.4; color: var(--tinta-suave); }
 @media (prefers-reduced-motion: reduce) { .disp-pista, .disp-pista::after { transition: none; } }
+
+/* ---------- Acceso: Google o cualquier correo (las tres puertas) ---------- */
+/* Tarjeta blanca: se ve igual sobre la arena (muro, páginas) y sobre el océano (árbol). */
+.acceso { width: min(100%, 420px); margin: 0 auto; padding: 22px; border-radius: 22px; background: #fff; color: var(--tinta); text-align: left;
+          display: flex; flex-direction: column; gap: 14px; box-shadow: 0 12px 32px rgba(19, 41, 61, .12); }
+.acceso :focus-visible { outline: 3px solid var(--ocre); outline-offset: 2px; }
+.acceso .acceso-google { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 52px; padding: 0 18px;
+                         border: 1px solid var(--bruma-2); border-radius: 14px; background: #fff; color: var(--oceano); font-size: 17px; font-weight: 700; cursor: pointer; }
+.acceso .acceso-google:hover { background: var(--arena-2); border-color: var(--oceano-3); }
+.acceso .acceso-o { display: flex; align-items: center; gap: 12px; margin: 4px 0 -6px; color: var(--tinta-suave); font-size: 15px; font-weight: 600; }
+.acceso .acceso-o::before, .acceso .acceso-o::after { content: ""; flex: 1; height: 1px; background: var(--linea); }
+.acceso-modos { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 14px; background: var(--arena); }
+.acceso-modos button { min-height: 44px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: var(--tinta-suave); font-size: 16px; font-weight: 600; cursor: pointer; }
+.acceso-modos button[aria-pressed="true"] { background: #fff; color: var(--oceano); font-weight: 700; box-shadow: 0 1px 4px rgba(19, 41, 61, .16); }
+.acceso-form { display: flex; flex-direction: column; gap: 14px; }
+.acceso-campo { display: flex; flex-direction: column; gap: 6px; }
+.acceso .campo { color: var(--oceano); gap: 0; }
+.acceso .campo small { font-size: 15px; font-weight: 400; color: var(--tinta-suave); }
+.acceso input.entrada { background: var(--arena-2); }
+.acceso input.entrada:focus { border-color: var(--atlantico); background: #fff; }
+.acceso-clave { position: relative; }
+.acceso-clave input.entrada { padding-right: 92px; }
+.acceso .acceso-ver { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); min-width: 76px; min-height: 44px; padding: 0 10px;
+                      border: 0; border-radius: 10px; background: transparent; color: var(--atlantico); font-size: 15px; font-weight: 700; cursor: pointer; }
+.acceso .acceso-ver:hover { background: var(--cielo-claro); }
+.acceso .primary, .acceso .ghost { width: 100%; }
+.acceso .ghost { min-height: 48px; font-size: 16px; }
+.acceso .ghost:disabled { opacity: .65; cursor: default; }
+.acceso .acceso-enlace { align-self: center; min-height: 44px; padding: 0 8px; font-size: 16px; }
+.acceso .acceso-nota, .acceso .acceso-texto, .acceso .acceso-msg { margin: 0; max-width: none; font-size: 15px; line-height: 1.45; color: var(--tinta-suave); }
+.acceso .acceso-texto { font-size: 16px; color: var(--tinta); }
+.acceso .acceso-centro { margin-top: -6px; text-align: center; }
+.acceso .acceso-correo { overflow-wrap: anywhere; color: var(--oceano); }
+.acceso .acceso-msg { padding: 10px 12px; border-radius: 12px; background: var(--arena-2); color: var(--tinta); }
+.acceso .acceso-msg.error { background: #FBEAE6; color: var(--peligro); }
+.acceso .acceso-msg.ok { background: var(--drago-claro); color: var(--drago-oscuro); }
+.acceso-confirmar { align-items: stretch; }
+.acceso .acceso-icono { width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--ocre-claro); color: var(--ocre-texto); }
+.acceso .acceso-titulo { margin: 0; font-family: var(--serif); font-size: 28px; font-weight: 600; line-height: 1.15; color: var(--oceano); }
+.acceso-acciones { display: flex; flex-direction: column; gap: 10px; }
+@media (max-width: 640px) { .acceso { padding: 18px; } }

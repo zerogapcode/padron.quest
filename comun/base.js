@@ -1,10 +1,11 @@
-// Módulo común de padron.quest: Firebase, acceso con Google, cabecera, avisos y utilidades.
+// Módulo común de padron.quest: Firebase, acceso (Google o cualquier correo), cabecera, avisos y utilidades.
 // Lo usan Mensajes, Fotos y Eventos; el muro y el árbol reutilizan la campana de avisos.
 // La seguridad real la imponen las reglas de Firestore y Storage.
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js";
 import {
   getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut,
-  connectAuthEmulator, signInWithCredential,
+  connectAuthEmulator, signInWithCredential, signInWithEmailAndPassword,
+  sendEmailVerification, sendPasswordResetEmail, updateProfile,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, query, where, limit, orderBy,
@@ -39,7 +40,18 @@ if (EMULADOR && !yaIniciada) {
   connectStorageEmulator(storage, "127.0.0.1", 9199 + EMU_DESPLAZA);
   window.__entrarPrueba = (email, nombre) => signInWithCredential(auth, GoogleAuthProvider.credential(
     JSON.stringify({ sub: email, email, email_verified: true, name: nombre || email })));
+  // Lee una ruta con la sesión actual (documento o colección) y devuelve "ok" o el código de error.
+  window.__leerPrueba = async (ruta) => {
+    const partes = ruta.split("/");
+    try {
+      if (partes.length % 2) await getDocs(query(collection(db, ...partes), limit(1)));
+      else await getDoc(doc(db, ...partes));
+      return "ok";
+    } catch (e) { return e.code || e.message; }
+  };
 }
+// Los correos de Firebase (confirmar el correo, crear contraseña nueva) llegan en español.
+auth.languageCode = "es";
 
 // ---------------------------------------------------------------------------
 // Utilidades
@@ -419,6 +431,438 @@ export function montarContadorMensajes(span) {
 }
 
 // ---------------------------------------------------------------------------
+// Acceso: con Google o con CUALQUIER correo (Hotmail, Yahoo, iCloud, trabajo…) y contraseña.
+// Lo usan las tres puertas: iniciarPagina (abajo), el muro y el árbol.
+// Las reglas exigen el correo confirmado (email_verified) y, con contraseña, la marca del servidor
+// (claveSegura): la contraseña solo se elige con el enlace que Firebase envía al correo (ver pedirEnlaceClave).
+// ---------------------------------------------------------------------------
+export const ACCESO = { esperaReenvio: 60 }; // segundos entre reenvíos del correo de confirmación
+if (EMULADOR) window.__acceso = ACCESO;
+
+// A dónde vuelve quien toca el enlace del correo (confirmar o crear contraseña nueva).
+const urlContinuar = () => `${location.origin}/muro/${EMULADOR ? `?emulador=${new URLSearchParams(location.search).get("emulador") || 1}` : ""}`;
+// Si Firebase no aceptara la dirección de vuelta, el correo se envía igual, sin ella.
+async function conVuelta(enviar) {
+  try { await enviar({ url: urlContinuar() }); }
+  catch (e) {
+    if (/continue-uri|unauthorized-domain/.test(e.code || "")) await enviar(undefined);
+    else throw e;
+  }
+}
+
+const ERRORES_ACCESO = {
+  "auth/invalid-credential": "El correo o la contraseña no son correctos. Revísalos e inténtalo de nuevo. Si te registraste con Google, usa el botón de Google.",
+  "auth/invalid-login-credentials": "auth/invalid-credential",
+  "auth/wrong-password": "auth/invalid-credential",
+  "auth/user-not-found": "auth/invalid-credential",
+  "auth/email-already-in-use": "Ese correo ya tiene cuenta: toca «Entrar». Si te registraste con Google, usa el botón de Google.",
+  "auth/weak-password": "Esa contraseña es muy fácil de adivinar. Usa al menos 8 caracteres, mezclando letras y números.",
+  "auth/invalid-email": "Ese correo no parece válido. Revísalo (por ejemplo: nombre@hotmail.com).",
+  "auth/missing-email": "auth/invalid-email",
+  "auth/missing-password": "Escribe tu contraseña.",
+  "auth/too-many-requests": "Demasiados intentos seguidos. Espera unos minutos y vuelve a intentarlo.",
+  "auth/network-request-failed": "No hay conexión a internet. Revisa tu conexión y vuelve a intentarlo.",
+  "auth/user-disabled": "Esta cuenta está desactivada. Escríbele a un administrador de la familia.",
+  "auth/account-exists-with-different-credential": "Ese correo ya tiene cuenta con contraseña: entra abajo con tu correo y tu contraseña.",
+  "auth/operation-not-allowed": "Esta forma de entrar no está disponible ahora. Avísale a un administrador de la familia.",
+  "auth/popup-blocked": "El navegador bloqueó la ventana de Google. Permite las ventanas emergentes e inténtalo de nuevo.",
+  // Cloud Function prepararCuenta («Crear cuenta», «¿Olvidaste tu contraseña?»).
+  "functions/invalid-argument": "auth/invalid-email",
+  "functions/resource-exhausted": "auth/too-many-requests",
+  "functions/unavailable": "auth/network-request-failed",
+  "functions/deadline-exceeded": "auth/network-request-failed",
+};
+// Mensaje claro en español; nunca el código técnico.
+export function mensajeAcceso(e) {
+  let t = ERRORES_ACCESO[e?.code];
+  if (t && ERRORES_ACCESO[t]) t = ERRORES_ACCESO[t];
+  if (!t && !navigator.onLine) t = ERRORES_ACCESO["auth/network-request-failed"];
+  return t || "No se pudo completar. Inténtalo de nuevo en un momento.";
+}
+
+const LOGO_GOOGLE = '<svg aria-hidden="true" viewBox="0 0 48 48" width="22" height="22"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
+
+async function entrarConGoogle(avisarError) {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  try { await signInWithPopup(auth, provider); }
+  catch (e) {
+    if (e.code === "auth/popup-closed-by-user" || e.code === "auth/cancelled-popup-request") return;
+    if (e.code === "auth/popup-blocked" || e.code === "auth/operation-not-supported-in-this-environment") {
+      try { await signInWithRedirect(auth, provider); return; } catch (e2) { e = e2; }
+    }
+    avisarError(mensajeAcceso(e));
+  }
+}
+
+// Cuándo se envió el último correo de confirmación (para la espera entre reenvíos), por cuenta.
+const CLAVE_ENVIO = "padron.confirmacionEnviada";
+const envios = new Map();
+function marcarEnvio(uid) {
+  envios.set(uid, Date.now());
+  try { localStorage.setItem(CLAVE_ENVIO, JSON.stringify({ uid, t: Date.now() })); } catch { /* nada */ }
+}
+function ultimoEnvio(uid) {
+  if (envios.has(uid)) return envios.get(uid);
+  try { const v = JSON.parse(localStorage.getItem(CLAVE_ENVIO) || "null"); if (v?.uid === uid) return v.t; } catch { /* nada */ }
+  return 0;
+}
+async function enviarConfirmacion(user) {
+  await conVuelta((ajustes) => sendEmailVerification(user, ajustes));
+  marcarEnvio(user.uid);
+}
+
+// «Crear cuenta» y «¿Olvidaste tu contraseña?» son lo mismo: la contraseña SOLO la elige quien tiene el
+// buzón, con el enlace del correo. Así nadie puede crear de antemano la cuenta de un familiar con una
+// contraseña suya (robo «pre-hijack»). La Cloud Function prepararCuenta deja lista la cuenta de un correo
+// invitado (sin contraseña, con la marca que exigen las reglas) y luego Firebase envía el enlace.
+// Responde igual para cualquier correo: no revela quién está invitado ni quién tiene cuenta.
+let prepararRemoto = null;
+function llamarPrepararCuenta(correo) {
+  prepararRemoto ||= import("https://www.gstatic.com/firebasejs/13.3.0/firebase-functions.js").then((f) => {
+    const fns = f.getFunctions(app, "us-central1");
+    if (EMULADOR) f.connectFunctionsEmulator(fns, "127.0.0.1", 5001 + EMU_DESPLAZA);
+    return f.httpsCallable(fns, "prepararCuenta");
+  }).catch((e) => { prepararRemoto = null; throw e; });
+  return prepararRemoto.then((llamar) => llamar({ correo }));
+}
+async function pedirEnlaceClave(correo) {
+  await llamarPrepararCuenta(correo);
+  try { await conVuelta((ajustes) => sendPasswordResetEmail(auth, correo, ajustes)); }
+  catch (e) {
+    // Solo se avisan los problemas de conexión o de formato; nunca si el correo tiene cuenta.
+    if (["auth/network-request-failed", "auth/invalid-email", "auth/too-many-requests"].includes(e.code)) throw e;
+  }
+}
+
+// El nombre que escribió en «Crear cuenta» se guarda en este navegador para proponérselo al entrar.
+const CLAVE_NOMBRE = "padron.nombreNuevo";
+function guardarNombrePendiente(correo, nombre) {
+  try { localStorage.setItem(CLAVE_NOMBRE, JSON.stringify({ correo, nombre })); } catch { /* nada */ }
+}
+function nombrePendiente(correo) {
+  try { const v = JSON.parse(localStorage.getItem(CLAVE_NOMBRE) || "null"); if (v?.correo === (correo || "").toLowerCase()) return v.nombre || ""; } catch { /* nada */ }
+  return "";
+}
+
+const correoValido = (c) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c);
+const limpiarCorreo = (c) => c.replace(/\s+/g, "").toLowerCase();
+const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Campo con etiqueta visible. `extra` son atributos del <input>.
+function campo(etiqueta, extra, pista) {
+  const input = h("input", { class: "entrada", ...extra });
+  const label = h("label", { class: "campo" }, h("span", { text: etiqueta }), pista ? h("small", { text: pista }) : null);
+  return { input, el: h("div", { class: "acceso-campo" }, label, input), label };
+}
+let idCampo = 0;
+function enlazar(c) { // une etiqueta e input por id (el botón Mostrar va dentro del mismo bloque)
+  const id = `acceso-${++idCampo}`;
+  c.input.id = id; c.label.setAttribute("for", id);
+  return c;
+}
+function campoClave(etiqueta, autocomplete, pista) {
+  const c = enlazar(campo(etiqueta, { type: "password", autocomplete, autocapitalize: "off", spellcheck: "false", enterkeyhint: "go", minlength: autocomplete === "new-password" ? "8" : null }, pista));
+  const ver = h("button", { type: "button", class: "acceso-ver", "aria-pressed": "false", "aria-controls": c.input.id, "aria-label": "Mostrar la contraseña", text: "Mostrar" });
+  ver.addEventListener("click", () => {
+    const mostrar = c.input.type === "password";
+    c.input.type = mostrar ? "text" : "password";
+    ver.textContent = mostrar ? "Ocultar" : "Mostrar";
+    ver.setAttribute("aria-pressed", String(mostrar));
+    ver.setAttribute("aria-label", mostrar ? "Ocultar la contraseña" : "Mostrar la contraseña");
+    c.input.focus();
+  });
+  c.el.replaceChildren(c.label, h("div", { class: "acceso-clave" }, c.input, ver));
+  return c;
+}
+// `autocomplete`: "username" en «Entrar» (así el gestor de contraseñas une el correo con la contraseña guardada).
+const campoCorreo = (siguiente = true, autocomplete = "email") => enlazar(campo("Correo electrónico", {
+  type: "email", inputmode: "email", autocomplete, autocapitalize: "off", spellcheck: "false",
+  enterkeyhint: siguiente ? "next" : "send", maxlength: "254",
+}));
+// «Siguiente» (Enter) en un campo que no es el último: pasa al siguiente campo vacío sin mostrar errores.
+// Si ya están todos llenos (p. ej. lo completó el gestor de contraseñas), envía el formulario.
+function encadenar(campos) {
+  campos.forEach((c, i) => c.input.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter" || ev.isComposing || i === campos.length - 1) return;
+    const vacio = campos.slice(i + 1).find((x) => !x.input.value.trim());
+    if (!vacio) return;
+    ev.preventDefault();
+    vacio.input.focus();
+  }));
+}
+// Mensaje bajo el formulario y botón ocupado mientras trabaja.
+function mensajero() {
+  const msg = h("p", { class: "acceso-msg", role: "status", "aria-live": "polite", hidden: true });
+  const decir = (texto, tipo = "error") => { msg.textContent = texto; msg.className = "acceso-msg " + tipo; msg.hidden = !texto; };
+  return { msg, decir };
+}
+async function ocupado(boton, texto, fn) {
+  const original = boton.textContent;
+  boton.disabled = true; boton.textContent = texto;
+  try { await fn(); } finally { if (boton.isConnected) { boton.disabled = false; boton.textContent = original; } }
+}
+
+/**
+ * Monta en `contenedor` el acceso: botón de Google y, debajo, "o con tu correo" con dos modos
+ * ("Entrar" y "Crear cuenta") más "¿Olvidaste tu contraseña?". Al entrar, onAuthStateChanged
+ * de cada página hace el resto.
+ */
+export function montarAcceso(contenedor) {
+  if (!contenedor) return;
+  const { msg, decir } = mensajero();
+
+  const google = h("button", { type: "button", class: "acceso-google" });
+  google.innerHTML = LOGO_GOOGLE;
+  google.append(h("span", { text: "Entrar con Google" }));
+  google.addEventListener("click", () => { decir(""); entrarConGoogle((t) => decir(t)); });
+
+  // --- Entrar ---
+  const eCorreo = campoCorreo(true, "username");
+  const eClave = campoClave("Contraseña", "current-password");
+  const eBoton = h("button", { type: "submit", class: "primary", text: "Entrar" });
+  const olvide = h("button", { type: "button", class: "enlace-boton acceso-enlace", text: "¿Olvidaste tu contraseña?" });
+  const fEntrar = h("form", { class: "acceso-form", novalidate: true, "aria-label": "Entrar con tu correo" }, eCorreo.el, eClave.el, eBoton, olvide);
+
+  // --- Crear cuenta: nombre y correo; la contraseña se elige con el enlace del correo ---
+  const cNombre = enlazar(campo("Nombre y apellido", { type: "text", autocomplete: "name", autocapitalize: "words", enterkeyhint: "next", maxlength: "80" }));
+  const cCorreo = campoCorreo(false);
+  cCorreo.label.append(h("small", { text: "El mismo con el que te invitaron." }));
+  const cBoton = h("button", { type: "submit", class: "primary", text: "Crear mi cuenta" });
+  const fCrear = h("form", { class: "acceso-form", novalidate: true, "aria-label": "Crear cuenta con tu correo", hidden: true },
+    cNombre.el, cCorreo.el, cBoton,
+    h("p", { class: "acceso-nota", text: "Te enviaremos un correo con un enlace para que elijas tu contraseña. Así nadie más puede crear tu cuenta." }));
+
+  // --- Olvidé mi contraseña ---
+  const rCorreo = campoCorreo(false);
+  const rBoton = h("button", { type: "submit", class: "primary", text: "Enviar el enlace" });
+  const volver = h("button", { type: "button", class: "enlace-boton acceso-enlace", text: "Volver a «Entrar»" });
+  const fOlvide = h("form", { class: "acceso-form", novalidate: true, "aria-label": "Crear una contraseña nueva", hidden: true },
+    h("p", { class: "acceso-nota", text: "Escribe tu correo y te enviaremos un enlace para crear una contraseña nueva." }),
+    rCorreo.el, rBoton, volver);
+
+  const tabEntrar = h("button", { type: "button", "aria-pressed": "true", text: "Entrar" });
+  const tabCrear = h("button", { type: "button", "aria-pressed": "false", text: "Crear cuenta" });
+  const modos = h("div", { class: "acceso-modos", role: "group", "aria-label": "Con tu correo" }, tabEntrar, tabCrear);
+
+  // El último correo escrito (en cualquiera de los tres modos) pasa a los otros, aunque ya tuvieran uno.
+  const correos = [eCorreo, cCorreo, rCorreo];
+  let correoEscrito = "";
+  correos.forEach((c) => c.input.addEventListener("input", () => { correoEscrito = c.input.value.trim(); }));
+  encadenar([eCorreo, eClave]);
+  encadenar([cNombre, cCorreo]);
+
+  const modo = (cual, enfocar = true) => {
+    fEntrar.hidden = cual !== "entrar";
+    fCrear.hidden = cual !== "crear";
+    fOlvide.hidden = cual !== "olvide";
+    modos.hidden = cual === "olvide";
+    tabEntrar.setAttribute("aria-pressed", String(cual === "entrar"));
+    tabCrear.setAttribute("aria-pressed", String(cual === "crear"));
+    decir("");
+    correos.forEach((c) => { c.input.value = correoEscrito; });
+    if (enfocar) (cual === "crear" ? cNombre : cual === "olvide" ? rCorreo : eCorreo).input.focus();
+  };
+  tabEntrar.addEventListener("click", () => modo("entrar"));
+  tabCrear.addEventListener("click", () => modo("crear"));
+  olvide.addEventListener("click", () => modo("olvide"));
+  volver.addEventListener("click", () => modo("entrar"));
+
+  // Comprueba los campos y enfoca el primero que falte.
+  const falta = (pares) => {
+    for (const [c, texto] of pares) if (texto) { decir(texto); c.input.focus(); return true; }
+    return false;
+  };
+  const errorCorreo = (correo) => (!correo ? "Escribe tu correo." : !correoValido(correo) ? ERRORES_ACCESO["auth/invalid-email"] : "");
+
+  fEntrar.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const correo = limpiarCorreo(eCorreo.input.value), clave = eClave.input.value;
+    if (falta([[eCorreo, errorCorreo(correo)], [eClave, !clave ? "Escribe tu contraseña." : ""]])) return;
+    decir("");
+    return ocupado(eBoton, "Entrando…", async () => {
+      try { await signInWithEmailAndPassword(auth, correo, clave); }
+      catch (e) { decir(mensajeAcceso(e)); eClave.input.select?.(); }
+    });
+  });
+
+  fCrear.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const nombre = cNombre.input.value.replace(/\s+/g, " ").trim(), correo = limpiarCorreo(cCorreo.input.value);
+    if (falta([[cNombre, nombre.length < 2 ? "Escribe tu nombre y apellido." : ""], [cCorreo, errorCorreo(correo)]])) return;
+    decir("");
+    guardarNombrePendiente(correo, nombre);
+    return ocupado(cBoton, "Enviando…", async () => {
+      try { await pedirEnlaceClave(correo); } catch (e) { decir(mensajeAcceso(e)); return; }
+      decir(`Listo. Si ${correo} está en la lista de la familia, en unos minutos te llegará un correo con un enlace para crear tu contraseña. Ábrelo, elige tu contraseña y luego vuelve aquí y toca «Entrar». Si no lo ves, revisa la carpeta de spam o correo no deseado.`, "ok");
+    });
+  });
+
+  fOlvide.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const correo = limpiarCorreo(rCorreo.input.value);
+    if (falta([[rCorreo, errorCorreo(correo)]])) return;
+    decir("");
+    return ocupado(rBoton, "Enviando…", async () => {
+      try { await pedirEnlaceClave(correo); } catch (e) { decir(mensajeAcceso(e)); return; }
+      decir(`Si ${correo} tiene cuenta, te enviamos un enlace para crear una contraseña nueva. Revisa también la carpeta de spam o correo no deseado.`, "ok");
+    });
+  });
+
+  contenedor.replaceChildren(h("div", { class: "acceso" },
+    google,
+    h("p", { class: "acceso-o" }, h("span", { text: "o con tu correo" })),
+    h("p", { class: "acceso-nota acceso-centro", text: "Gmail, Hotmail, Outlook, Yahoo, iCloud o el de tu trabajo." }),
+    modos, fEntrar, fCrear, fOlvide, msg));
+  modo("entrar", false);
+}
+
+// ¿Le falta un paso antes de entrar? Confirmar el correo o, si su cuenta no tiene nombre, escribirlo.
+export const accesoPendiente = (user) => !user.emailVerified || !(user.displayName || "").trim();
+
+/**
+ * Pasos antes de entrar, en `contenedor`: "Confirma tu correo" (si el correo no está confirmado) y
+ * "¿Cómo te llamas?" (si la cuenta no tiene nombre). `alConfirmar(user)` se llama al terminar, con el
+ * token ya renovado (las reglas leen email_verified y name del token).
+ */
+export function vistaConfirmarCorreo(contenedor, user, alConfirmar) {
+  if (!contenedor) return;
+  const seguir = (u) => ((u.displayName || "").trim() ? alConfirmar(u) : vistaNombre(contenedor, u, alConfirmar));
+  if (user.emailVerified) { seguir(user); return; }
+  const { msg, decir } = mensajero();
+  const destino = h("strong", { class: "acceso-correo", text: user.email || "" });
+  const ya = h("button", { type: "button", class: "primary", text: "Ya lo confirmé" });
+  const reenviar = h("button", { type: "button", class: "ghost", text: "Reenviar el correo" });
+  const otro = h("button", { type: "button", class: "enlace-boton acceso-enlace", text: "Usar otro correo", onclick: () => signOut(auth) });
+  const tarjeta = h("div", { class: "acceso acceso-confirmar" },
+    h("span", { class: "acceso-icono", "aria-hidden": "true" }, svgIcono(["M4 6.5h16v11H4z", "m4.5 7 7.5 6 7.5-6"], 28)),
+    h("h1", { class: "acceso-titulo", text: "Confirma tu correo" }),
+    h("p", { class: "acceso-texto" }, "Te enviamos un enlace a ", destino, ". Ábrelo para confirmar que el correo es tuyo y luego vuelve aquí."),
+    h("p", { class: "acceso-nota", text: "¿No lo ves? Revisa la carpeta de spam o correo no deseado. Puede tardar unos minutos." }),
+    h("div", { class: "acceso-acciones" }, ya, reenviar, otro), msg);
+  contenedor.replaceChildren(tarjeta);
+
+  let fin = false;
+  const terminar = () => { fin = true; clearInterval(reloj); document.removeEventListener("visibilitychange", alVolver); };
+  // Espera entre reenvíos (se recalcula cada segundo; la prueba puede acortarla en el emulador).
+  const tic = () => {
+    if (!tarjeta.isConnected) { terminar(); return; }
+    const falta = Math.ceil((ultimoEnvio(user.uid) + ACCESO.esperaReenvio * 1000 - Date.now()) / 1000);
+    if (reenviar.getAttribute("aria-busy")) return;
+    reenviar.disabled = falta > 0;
+    reenviar.textContent = falta > 0 ? `Reenviar el correo (en ${falta} s)` : "Reenviar el correo";
+  };
+  let reloj = 0;
+
+  const comprobar = async (silencioso) => {
+    const u = auth.currentUser;
+    if (fin || !u || u.uid !== user.uid) return;
+    try {
+      await u.reload();
+      if (!u.emailVerified) {
+        if (!silencioso) decir("Todavía no vemos la confirmación. Abre el enlace del correo que te enviamos y vuelve a tocar «Ya lo confirmé».", "error");
+        return;
+      }
+      await u.getIdToken(true); // el token nuevo lleva email_verified (y el nombre) para las reglas
+      terminar();
+      seguir(u);
+    } catch (e) {
+      if (!silencioso) decir(mensajeAcceso(e), "error");
+    }
+  };
+  // Al volver a esta pestaña (después de abrir el enlace en el correo) se comprueba sola.
+  const alVolver = () => { if (document.visibilityState === "visible") comprobar(true); };
+
+  ya.addEventListener("click", async () => {
+    ya.disabled = true;
+    decir("");
+    try { await comprobar(false); } finally { ya.disabled = false; }
+  });
+  const enviar = async (avisarListo) => {
+    reenviar.disabled = true;
+    reenviar.setAttribute("aria-busy", "true");
+    try {
+      await enviarConfirmacion(auth.currentUser || user);
+      if (avisarListo) decir(`Listo: te enviamos otro enlace a ${user.email}.`, "ok");
+    } catch (e) {
+      decir(mensajeAcceso(e), "error");
+    } finally {
+      reenviar.removeAttribute("aria-busy");
+      tic();
+    }
+  };
+  reenviar.addEventListener("click", () => { if (!reenviar.disabled) enviar(true); });
+
+  reloj = setInterval(tic, 1000);
+  tic();
+  document.addEventListener("visibilitychange", alVolver);
+  // Si a esta cuenta aún no se le envió ningún enlace desde este navegador, se envía ya.
+  if (!ultimoEnvio(user.uid)) enviar(false);
+}
+
+// "¿Cómo te llamas?": cuentas sin nombre (las de correo, al entrar la primera vez). Reintenta si falla la conexión.
+function vistaNombre(contenedor, user, alListo) {
+  const { msg, decir } = mensajero();
+  const c = enlazar(campo("Nombre y apellido", { type: "text", autocomplete: "name", autocapitalize: "words", enterkeyhint: "done", maxlength: "80" }));
+  c.input.value = nombrePendiente(user.email);
+  const boton = h("button", { type: "submit", class: "primary", text: "Continuar" });
+  const form = h("form", { class: "acceso-form", novalidate: true, "aria-label": "Tu nombre" }, c.el, boton);
+  const otro = h("button", { type: "button", class: "enlace-boton acceso-enlace", text: "Usar otro correo", onclick: () => signOut(auth) });
+  contenedor.replaceChildren(h("div", { class: "acceso acceso-confirmar acceso-nombre" },
+    h("span", { class: "acceso-icono", "aria-hidden": "true" }, svgIcono(["M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z", "M4.5 20a7.5 7.5 0 0 1 15 0"], 28)),
+    h("h1", { class: "acceso-titulo", text: "¿Cómo te llamas?" }),
+    h("p", { class: "acceso-texto", text: "Así te verá la familia en el muro, los mensajes y el árbol." }),
+    form, otro, msg));
+  if (!c.input.value) c.input.focus();
+
+  form.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const nombre = c.input.value.replace(/\s+/g, " ").trim();
+    if (nombre.length < 2) { decir("Escribe tu nombre y apellido."); c.input.focus(); return; }
+    decir("");
+    return ocupado(boton, "Guardando…", async () => {
+      const u = auth.currentUser;
+      if (!u || u.uid !== user.uid) return;
+      let error = null;
+      for (let intento = 0; intento < 3; intento++) {
+        try {
+          if (u.displayName !== nombre) await updateProfile(u, { displayName: nombre });
+          await u.getIdToken(true); // las reglas de profiles comparan con el nombre del token
+          error = null;
+          break;
+        } catch (e) { error = e; await espera(700 * (intento + 1)); }
+      }
+      if (error) { decir(mensajeAcceso(error)); return; }
+      try { localStorage.removeItem(CLAVE_NOMBRE); } catch { /* nada */ }
+      alListo(u);
+    });
+  });
+}
+
+// El token de sesión puede haberse emitido antes de confirmar el correo o de poner el nombre:
+// las reglas leen email_verified y name del token, así que se renueva si no coincide con la cuenta.
+export async function asegurarToken(user) {
+  try {
+    const { claims } = await user.getIdTokenResult();
+    if (claims.email_verified !== user.emailVerified || (user.displayName && claims.name !== user.displayName)) await user.getIdToken(true);
+  } catch (e) { console.warn("sesión:", e.code || e.message); }
+}
+
+// ¿Es de la familia? Admin (solo los admins pueden listar members) o invitado en members/{correo en minúsculas}.
+export async function comprobarFamilia(user) {
+  await asegurarToken(user);
+  const email = (user.email || "").toLowerCase();
+  let isAdmin = false;
+  try { await getDocs(query(collection(db, "members"), limit(1))); isAdmin = true; } catch { /* no es admin */ }
+  let member = null;
+  try { const m = await getDoc(doc(db, "members", email)); if (m.exists()) member = m.data(); } catch { /* nada */ }
+  return { email, isAdmin, member };
+}
+
+// Texto de "Aún no estás invitado" (las tres puertas).
+export const TEXTO_NO_INVITADO = "no está en la lista de familiares. Si te invitaron con otro correo, toca «Usar otro correo» y entra con ese mismo. Si no, pídele a un administrador de la familia que te agregue.";
+
+// ---------------------------------------------------------------------------
 // Página estándar: cabecera + acceso + arranque
 // ---------------------------------------------------------------------------
 export const SECCIONES = [
@@ -469,40 +913,22 @@ export function iniciarPagina({ activa, raiz, alEntrar, alSalir }) {
   const limpiar = () => { while (limpiezas.length) { try { limpiezas.pop()(); } catch { /* nada */ } } alSalir?.(); };
 
   const mostrarLogin = () => {
-    const err = h("p", { class: "error", hidden: true });
+    const acceso = h("div");
     gate.replaceChildren(
       h("h1", {}, "La familia ", h("span", { class: "accent", text: "Padrón Perera" })),
-      h("p", { class: "muted", text: "Solo para familiares invitados. Entra con tu cuenta de Google." }),
-      h("button", { type: "button", class: "primary", text: "Entrar con Google", onclick: async () => {
-        err.hidden = true;
-        const provider = new GoogleAuthProvider();
-        provider.setCustomParameters({ prompt: "select_account" });
-        try { await signInWithPopup(auth, provider); }
-        catch (e) {
-          if (e.code === "auth/popup-blocked" || e.code === "auth/operation-not-supported-in-this-environment") { await signInWithRedirect(auth, provider); return; }
-          if (e.code === "auth/popup-closed-by-user" || e.code === "auth/cancelled-popup-request") return;
-          err.textContent = "No se pudo entrar: " + (e.code || e.message); err.hidden = false;
-        }
-      } }), err);
+      h("p", { class: "muted", text: "Solo para familiares invitados. Entra con Google o con tu correo." }),
+      acceso);
+    montarAcceso(acceso);
   };
 
-  onAuthStateChanged(auth, async (u) => {
-    limpiar();
-    raiz.hidden = true;
-    gate.hidden = false;
-    nav.hidden = true;
-    user.hidden = true;
-    if (!u) { mostrarLogin(); return; }
+  const entrar = async (u) => {
     gate.replaceChildren(h("p", { class: "muted", text: "Cargando…" }));
-    const email = (u.email || "").toLowerCase();
-    let isAdmin = false;
-    try { await getDocs(query(collection(db, "members"), limit(1))); isAdmin = true; } catch { /* no es admin */ }
-    let member = null;
-    try { const m = await getDoc(doc(db, "members", email)); if (m.exists()) member = m.data(); } catch { /* nada */ }
+    const { email, isAdmin, member } = await comprobarFamilia(u);
+    if (auth.currentUser?.uid !== u.uid) return; // cerró sesión mientras tanto
     if (!isAdmin && !member) {
       gate.replaceChildren(h("h1", { text: "Aún no estás invitado" }),
-        h("p", { class: "muted" }, "La cuenta ", h("strong", { text: email }), " no está en la lista de familiares. Pídele a un administrador que te agregue."),
-        h("button", { type: "button", class: "ghost", text: "Usar otra cuenta", onclick: () => signOut(auth) }));
+        h("p", { class: "muted" }, "La cuenta ", h("strong", { text: email }), " " + TEXTO_NO_INVITADO),
+        h("button", { type: "button", class: "ghost", text: "Usar otro correo", onclick: () => signOut(auth) }));
       return;
     }
     // merge: no borra lo que el familiar escribió en su perfil ("Sobre mí", ciudad).
@@ -510,12 +936,12 @@ export function iniciarPagina({ activa, raiz, alEntrar, alSalir }) {
       name: nombrePerfil(u, email), photoURL: fotoPerfil(u.photoURL), email,
       personId: member?.personId || null, updatedAt: serverTimestamp(),
     }, { merge: true }).catch((e) => console.warn("perfil:", e.code || e.message));
-    $("user-name").textContent = u.displayName || email;
+    $("user-name").textContent = u.displayName || member?.name || email;
     const foto = safeUrl(u.photoURL);
     $("user-photo").hidden = !foto;
     if (foto) $("user-photo").src = foto;
     $("user-ini").hidden = Boolean(foto);
-    $("user-ini").textContent = initials(u.displayName || email);
+    $("user-ini").textContent = initials(u.displayName || member?.name || email);
     nav.hidden = false;
     user.hidden = false;
     gate.hidden = true;
@@ -524,6 +950,18 @@ export function iniciarPagina({ activa, raiz, alEntrar, alSalir }) {
     limpiezas.push(montarContadorMensajes($("navMensajes")));
     const extra = await alEntrar({ user: u, isAdmin, member });
     if (typeof extra === "function") limpiezas.push(extra);
+  };
+
+  onAuthStateChanged(auth, (u) => {
+    limpiar();
+    raiz.hidden = true;
+    gate.hidden = false;
+    nav.hidden = true;
+    user.hidden = true;
+    if (!u) { mostrarLogin(); return; }
+    // Con correo y contraseña: primero confirmar el correo (las reglas no dejan leer nada antes) y poner su nombre.
+    if (accesoPendiente(u)) { vistaConfirmarCorreo(gate, u, entrar); return; }
+    entrar(u);
   });
 }
 

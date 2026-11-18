@@ -1,19 +1,22 @@
 // ============================================================================
 // El árbol de los Padrón Perera · padron.quest/arbol
-// Firebase Auth (Google) + Firestore. Las reglas de Firestore imponen:
+// Firebase Auth (Google o cualquier correo) + Firestore. Las reglas de Firestore imponen:
 //   - solo miembros leen el árbol;
 //   - solo administradores escriben `people` (directo o al aprobar);
 //   - cualquier miembro crea `proposals`; solo administradores las deciden.
 // Ningún dato familiar vive en este archivo (el repo es público).
 // ============================================================================
 import {
-  GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut,
+  onAuthStateChanged, signOut,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 import {
   collection, doc, getDoc, getDocs, onSnapshot, query, where, limit, orderBy,
   writeBatch, serverTimestamp, addDoc, deleteDoc, setDoc, updateDoc,
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
-import { auth, db, EMULADOR, avisar, montarCampana, montarContadorMensajes } from "/comun/base.js";
+import {
+  auth, db, EMULADOR, avisar, montarCampana, montarContadorMensajes,
+  montarAcceso, vistaConfirmarCorreo, accesoPendiente, comprobarFamilia, TEXTO_NO_INVITADO,
+} from "/comun/base.js";
 
 // Solo con los emuladores locales: acceso directo para probar que las reglas niegan lo que deben.
 if (EMULADOR) window.__db = { db, doc, setDoc, getDoc, getDocs, updateDoc, collection, query, where, serverTimestamp };
@@ -186,25 +189,10 @@ function timeAgo(date) {
 function showGate(which) {
   $("gate").hidden = which === null;
   $("app").hidden = which !== null;
-  ["gate-loading", "gate-login", "gate-denied", "gate-empty"].forEach((id) => { $(id).hidden = id !== which; });
+  ["gate-loading", "gate-login", "gate-verify", "gate-denied", "gate-empty"].forEach((id) => { $(id).hidden = id !== which; });
 }
 
-$("btnLogin").addEventListener("click", async () => {
-  $("loginError").hidden = true;
-  const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: "select_account" });
-  try {
-    await signInWithPopup(auth, provider);
-  } catch (err) {
-    if (err.code === "auth/popup-blocked" || err.code === "auth/operation-not-supported-in-this-environment") {
-      await signInWithRedirect(auth, provider);
-      return;
-    }
-    if (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") return;
-    $("loginError").textContent = "No se pudo entrar: " + (err.code || err.message);
-    $("loginError").hidden = false;
-  }
-});
+$("deniedText").textContent = TEXTO_NO_INVITADO;
 $("btnLogout").addEventListener("click", () => signOut(auth));
 $("btnLogoutDenied").addEventListener("click", () => signOut(auth));
 $("btnRetry").addEventListener("click", () => auth.currentUser && enter(auth.currentUser));
@@ -212,7 +200,13 @@ $("btnRetry").addEventListener("click", () => auth.currentUser && enter(auth.cur
 onAuthStateChanged(auth, (user) => {
   stopListeners();
   state.user = user;
-  if (!user) { showGate("gate-login"); return; }
+  if (!user) { montarAcceso($("acceso")); showGate("gate-login"); return; }
+  // Con correo y contraseña: primero confirmar el correo (las reglas no dejan leer nada antes) y poner su nombre.
+  if (accesoPendiente(user)) {
+    vistaConfirmarCorreo($("gate-verify"), user, (u) => { state.user = u; enter(u); });
+    showGate("gate-verify");
+    return;
+  }
   enter(user);
 });
 
@@ -222,23 +216,17 @@ function stopListeners() {
 
 async function enter(user) {
   showGate("gate-loading");
-  const email = (user.email || "").toLowerCase();
-  state.isAdmin = false;
-  try {
-    await getDocs(query(collection(db, "members"), limit(1)));
-    state.isAdmin = true; // solo los admins pueden listar miembros
-  } catch { /* no es admin */ }
-  let member = state.isAdmin;
-  if (!member) {
-    try { member = (await getDoc(doc(db, "members", email))).exists(); } catch { member = false; }
-  }
-  if (!member) {
+  const familia = await comprobarFamilia(user);
+  if (auth.currentUser?.uid !== user.uid) return; // cerró sesión mientras tanto
+  const email = familia.email;
+  state.isAdmin = familia.isAdmin;
+  if (!familia.isAdmin && !familia.member) {
     $("deniedEmail").textContent = email;
     showGate("gate-denied");
     return;
   }
 
-  $("userName").textContent = user.displayName || email;
+  $("userName").textContent = user.displayName || familia.member?.name || email;
   const photo = safeUrl(user.photoURL);
   $("userPhoto").hidden = !photo;
   if (photo) $("userPhoto").src = photo;

@@ -50,7 +50,7 @@ iniciarPagina({
 function titulo(c) {
   if (c.title) return c.title;
   const otros = (c.members || []).filter((u) => u !== st.yo.uid);
-  // Primero el nombre del perfil (las reglas lo atan a la cuenta de Google); info solo como respaldo.
+  // Primero el nombre del perfil (las reglas lo atan al nombre de la cuenta); info solo como respaldo.
   const nombres = otros.map((u) => st.perfiles.get(u)?.name || c.info?.[u]?.name || "Familiar");
   return nombres.join(", ") || "Solo tú";
 }

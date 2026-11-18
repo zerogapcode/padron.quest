@@ -1177,13 +1177,18 @@ dialog.modern-dialog::backdrop {
 
 .gate { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: var(--oceano); color: #F5F0E8; overflow: auto; }
 .gate-card { max-width: 480px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 18px; }
-.gate-card h1 { margin: 0; font-family: var(--font-serif); font-weight: 600; font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1.1; }
+.gate-card h1 { margin: 0; font-family: var(--font-serif); font-weight: 600; font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1.1; color: #F5F0E8; }
 .gate-card h1 em { color: var(--ocre); font-weight: 500; }
 .gate-card p { margin: 0; color: #C9D3DC; font-size: 1.05rem; line-height: 1.55; }
 .gate-card .btn-gate { display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 24px; border: 0; border-radius: 14px; background: var(--ocre); color: #13293D; font: inherit; font-size: 1.05rem; font-weight: 700; cursor: pointer; text-decoration: none; }
 .gate-card .btn-gate.ghost { background: transparent; border: 1px solid rgba(245, 240, 232, .35); color: #F5F0E8; }
 .gate-card .error { color: #F2B8A0; }
 .gate-card code { color: #F5F0E8; }
+.gate-card .gate-acceso, .gate-card.gate-acceso { width: 100%; align-self: stretch; }
+/* Con el formulario de acceso la tarjeta puede ser más alta que el teléfono: centrada si cabe, y si no, desde arriba (con scroll). */
+.gate { place-items: start center; }
+.gate > .gate-card { margin: auto 0; }
+.gate-card code { overflow-wrap: anywhere; }
 
 .user-chip { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-secondary); }
 .user-chip img { width: 30px; height: 30px; border-radius: 999px; }

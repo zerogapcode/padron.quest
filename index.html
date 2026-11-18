@@ -333,9 +333,9 @@
           <h2 id="titulo-unirse">¿Eres <span class="serif-acento">Padrón</span> o <span class="serif-acento">Perera</span>?</h2>
           <p>Cualquier descendiente de los Padrón o de los Perera, y su pareja, puede pedir su invitación. La red la administra la propia familia y abre por etapas.</p>
           <ol class="pasos">
-            <li><span>1</span><span>Pide tu invitación y di qué correo de Google usas</span></li>
+            <li><span>1</span><span>Pide tu invitación y di qué correo usas (Gmail, Hotmail, iCloud… cualquiera sirve)</span></li>
             <li><span>2</span><span>Un administrador de la familia te agrega</span></li>
-            <li><span>3</span><span>Entra con tu cuenta de Google</span></li>
+            <li><span>3</span><span>Entra con Google o con tu correo y una contraseña</span></li>
           </ol>
           <div class="acciones">
             <a class="btn btn-ocre" id="pedir" href="#unirse">Pedir mi invitación</a>
@@ -374,7 +374,7 @@
     // WhatsApp: solo dígitos con código de país.
     const WHATSAPP = "584144268290";
     const CORREO = "florez.carmenluisa" + "@" + "gmail.com";
-    const MENSAJE = "Hola, soy de la familia Padrón Perera y quiero mi invitación a padron.quest.\nMi nombre: \nMi correo de Google: ";
+    const MENSAJE = "Hola, soy de la familia Padrón Perera y quiero mi invitación a padron.quest.\nMi nombre: \nMi correo (el que usaré para entrar): ";
 
     (function contacto() {
       const boton = document.getElementById("pedir");
@@ -395,7 +395,7 @@
       } else {
         // Sin contacto configurado: no mostrar un botón que no lleva a ningún lado.
         boton.hidden = true;
-        nota.textContent = "Pídele tu invitación a quien administra la red en tu familia, con el correo de Google que usas.";
+        nota.textContent = "Pídele tu invitación a quien administra la red en tu familia y dile qué correo usas (Gmail, Hotmail, iCloud… cualquiera sirve).";
       }
     })();
 

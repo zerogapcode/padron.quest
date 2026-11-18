@@ -168,6 +168,8 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 600; }
 
 .admin { background: #fff; border: 2px solid var(--cielo-claro); }
 .member-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.member-label { font-size: 15px; font-weight: 600; color: var(--oceano); }
+.member-form input { font-size: 16px; }
 .member-form input, .member-form select, .member-list select { width: 100%; min-height: 44px; background: var(--arena-2); border: 1px solid var(--linea); border-radius: 12px; padding: 0 12px; }
 .member-list { list-style: none; padding: 0; display: flex; flex-direction: column; }
 .member-list li { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--linea-2); overflow-wrap: anywhere; }
